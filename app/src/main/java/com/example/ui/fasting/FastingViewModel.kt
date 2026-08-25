@@ -25,7 +25,10 @@ class FastingViewModel(application: Application) : AndroidViewModel(application)
     val isFasting = _isFasting.asStateFlow()
     
     private val _startTime = MutableStateFlow(0L)
-    private val _targetDurationMillis = MutableStateFlow(16L * 3600 * 1000) // 16h preset
+    val startTime = _startTime.asStateFlow()
+
+    private val _targetDurationMillis = MutableStateFlow(16L * 3600 * 1000)
+    val targetDurationMillis = _targetDurationMillis.asStateFlow()
 
     private val _elapsedMillis = MutableStateFlow(0L)
     val elapsedMillis = _elapsedMillis.asStateFlow()
@@ -37,11 +40,9 @@ class FastingViewModel(application: Application) : AndroidViewModel(application)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val currentStreak = pastSessions.map { sessions ->
-        // Simple streak logic for demonstration
         if (sessions.isEmpty()) 0 else {
-           // Basic logic: count consecutive days
-           // For prototype, we'll just return the number of sessions
-           sessions.size
+            // Count unique days or total completed sessions
+            sessions.size
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
@@ -64,34 +65,44 @@ class FastingViewModel(application: Application) : AndroidViewModel(application)
         _isFasting.value = true
 
         val context = getApplication<Application>()
-        val intent = Intent(context, FastingService::class.java).apply {
-            action = FastingService.ACTION_START_FAST
-            putExtra(FastingService.EXTRA_START_TIME, now)
-            putExtra(FastingService.EXTRA_TARGET_TIME, durationMillis)
+        try {
+            val intent = Intent(context, FastingService::class.java).apply {
+                action = FastingService.ACTION_START_FAST
+                putExtra(FastingService.EXTRA_START_TIME, now)
+                putExtra(FastingService.EXTRA_TARGET_TIME, durationMillis)
+            }
+            context.startForegroundService(intent)
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
-        context.startForegroundService(intent)
     }
 
     fun endFast() {
         if (!_isFasting.value) return
         val end = System.currentTimeMillis()
+        val start = _startTime.value
+        val target = _targetDurationMillis.value
         _isFasting.value = false
         
         viewModelScope.launch {
             dao.insertSession(
                 FastSession(
-                    startTime = _startTime.value,
+                    startTime = start,
                     endTime = end,
-                    durationTargetMillis = _targetDurationMillis.value
+                    durationTargetMillis = target
                 )
             )
         }
         
         val context = getApplication<Application>()
-        val intent = Intent(context, FastingService::class.java).apply {
-            action = FastingService.ACTION_STOP_FAST
+        try {
+            val intent = Intent(context, FastingService::class.java).apply {
+                action = FastingService.ACTION_STOP_FAST
+            }
+            context.startService(intent)
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
-        context.startService(intent)
     }
     
     fun logPastFast(startTime: Long, endTime: Long, targetDurationMillis: Long) {

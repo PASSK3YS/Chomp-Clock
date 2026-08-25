@@ -1,6 +1,7 @@
 package com.example.data.local.dao
 
 import androidx.room.Dao
+import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
@@ -14,6 +15,12 @@ interface FoodEntryDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertEntry(entry: FoodEntry)
+
+    @Delete
+    suspend fun deleteEntry(entry: FoodEntry)
+
+    @Query("DELETE FROM food_entries WHERE id = :id")
+    suspend fun deleteById(id: Int)
 
     @Query("DELETE FROM food_entries")
     suspend fun deleteAll()

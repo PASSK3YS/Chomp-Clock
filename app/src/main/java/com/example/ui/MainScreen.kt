@@ -1,11 +1,14 @@
 package com.example.ui
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -34,24 +37,19 @@ fun MainScreen(
             modifier = Modifier.padding(innerPadding)
         ) {
             composable("fasting") {
-                FastingScreen(username = userPrefs.username)
+                FastingScreen(userPrefs = userPrefs)
             }
             composable("weight") {
-                WeightScreen(
-                    username = userPrefs.username,
-                    heightCm = userPrefs.heightCm,
-                    gender = userPrefs.gender,
-                    useImperial = userPrefs.useImperial
-                )
+                WeightScreen(userPrefs = userPrefs)
             }
             composable("food") {
-                FoodScreen(username = userPrefs.username)
+                FoodScreen(userPrefs = userPrefs)
             }
             composable("stats") {
-                StatsScreen(username = userPrefs.username)
+                StatsScreen(userPrefs = userPrefs)
             }
             composable("settings") {
-                SettingsScreen()
+                SettingsScreen(userPrefs = userPrefs)
             }
         }
     }
@@ -67,16 +65,14 @@ fun BottomNavigationBar(navController: NavHostController) {
         NavigationItem("Settings", "settings", Icons.Default.Settings)
     )
 
-    androidx.compose.material3.Surface(
-        color = androidx.compose.ui.graphics.Color(0xFF0A0A0A),
+    Surface(
+        color = Color(0xFF0A0A0A),
         shadowElevation = 8.dp,
-        border = androidx.compose.foundation.BorderStroke(
-            1.dp, androidx.compose.ui.graphics.Color(0xFF18181B)
-        )
+        border = BorderStroke(1.dp, Color(0xFF18181B))
     ) {
         NavigationBar(
-            containerColor = androidx.compose.ui.graphics.Color.Transparent,
-            contentColor = androidx.compose.ui.graphics.Color(0xFFA1A1AA) // Zinc400
+            containerColor = Color.Transparent,
+            contentColor = Color(0xFFA1A1AA)
         ) {
             val navBackStackEntry by navController.currentBackStackEntryAsState()
             val currentRoute = navBackStackEntry?.destination?.route
@@ -95,11 +91,11 @@ fun BottomNavigationBar(navController: NavHostController) {
                         }
                     },
                     colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = androidx.compose.ui.graphics.Color(0xFF60A5FA), // Blue400
-                        selectedTextColor = androidx.compose.ui.graphics.Color(0xFF60A5FA),
-                        indicatorColor = androidx.compose.ui.graphics.Color.Transparent,
-                        unselectedIconColor = androidx.compose.ui.graphics.Color(0xFF71717A), // Zinc500
-                        unselectedTextColor = androidx.compose.ui.graphics.Color(0xFF71717A)
+                        selectedIconColor = Color(0xFF60A5FA),
+                        selectedTextColor = Color(0xFF60A5FA),
+                        indicatorColor = Color.Transparent,
+                        unselectedIconColor = Color(0xFF71717A),
+                        unselectedTextColor = Color(0xFF71717A)
                     )
                 )
             }
@@ -107,4 +103,4 @@ fun BottomNavigationBar(navController: NavHostController) {
     }
 }
 
-data class NavigationItem(val title: String, val route: String, val icon: androidx.compose.ui.graphics.vector.ImageVector)
+data class NavigationItem(val title: String, val route: String, val icon: ImageVector)
