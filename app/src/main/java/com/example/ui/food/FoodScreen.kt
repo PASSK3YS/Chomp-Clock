@@ -537,6 +537,40 @@ fun FoodItemRow(
     item: FoodEntry,
     onDelete: () -> Unit
 ) {
+    var showConfirmDelete by remember { mutableStateOf(false) }
+
+    if (showConfirmDelete) {
+        AlertDialog(
+            onDismissRequest = { showConfirmDelete = false },
+            title = { Text("Delete Food Log", color = Color.White, fontWeight = FontWeight.Bold) },
+            text = {
+                Text(
+                    "Remove \"${item.name}\" (${item.calories} kcal) from today's log?",
+                    color = Color(0xFFA1A1AA),
+                    fontSize = 14.sp
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        onDelete()
+                        showConfirmDelete = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDC2626))
+                ) {
+                    Text("Delete", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showConfirmDelete = false }) {
+                    Text("Cancel", color = Color(0xFFA1A1AA))
+                }
+            },
+            containerColor = Color(0xFF18181B),
+            shape = RoundedCornerShape(16.dp)
+        )
+    }
+
     Surface(
         shape = RoundedCornerShape(10.dp),
         color = Color(0xFF27272A).copy(alpha = 0.5f),
@@ -546,7 +580,7 @@ fun FoodItemRow(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 8.dp),
+                .padding(start = 12.dp, top = 6.dp, bottom = 6.dp, end = 6.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -567,7 +601,7 @@ fun FoodItemRow(
             }
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 Text(
                     text = "${item.calories} kcal",
@@ -576,14 +610,14 @@ fun FoodItemRow(
                     fontSize = 13.sp
                 )
                 IconButton(
-                    onClick = onDelete,
-                    modifier = Modifier.size(24.dp)
+                    onClick = { showConfirmDelete = true },
+                    modifier = Modifier.size(32.dp)
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Close,
-                        contentDescription = "Delete",
+                        imageVector = Icons.Default.DeleteOutline,
+                        contentDescription = "Delete food entry",
                         tint = Color(0xFF71717A),
-                        modifier = Modifier.size(16.dp)
+                        modifier = Modifier.size(17.dp)
                     )
                 }
             }

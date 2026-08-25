@@ -1,6 +1,7 @@
 package com.example.data.local.dao
 
 import androidx.room.Dao
+import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
@@ -15,6 +16,12 @@ interface FastSessionDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertSession(session: FastSession)
     
+    @Delete
+    suspend fun deleteSession(session: FastSession)
+
+    @Query("DELETE FROM fast_sessions WHERE id = :id")
+    suspend fun deleteById(id: Int)
+
     @Query("DELETE FROM fast_sessions")
     suspend fun deleteAll()
 }

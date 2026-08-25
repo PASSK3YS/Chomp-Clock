@@ -1,6 +1,7 @@
 package com.example.data.local.dao
 
 import androidx.room.Dao
+import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
@@ -14,6 +15,12 @@ interface WeightEntryDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertEntry(entry: WeightEntry)
+
+    @Delete
+    suspend fun deleteEntry(entry: WeightEntry)
+
+    @Query("DELETE FROM weight_entries WHERE id = :id")
+    suspend fun deleteById(id: Int)
 
     @Query("DELETE FROM weight_entries")
     suspend fun deleteAll()

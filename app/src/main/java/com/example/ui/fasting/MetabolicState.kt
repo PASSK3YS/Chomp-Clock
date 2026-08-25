@@ -2,6 +2,14 @@ package com.example.ui.fasting
 
 import androidx.compose.ui.graphics.Color
 
+data class StageBiomarkers(
+    val bloodSugar: String,
+    val insulin: String,
+    val ketones: String,
+    val autophagy: String,
+    val growthHormone: String
+)
+
 data class MetabolicState(
     val id: String,
     val title: String,
@@ -14,6 +22,7 @@ data class MetabolicState(
     val shortSummary: String,
     val physiologicalProcess: String,
     val primaryFuelSource: String,
+    val biomarkers: StageBiomarkers,
     val keyBenefits: List<String>,
     val tips: String
 )
@@ -32,6 +41,13 @@ object FastingMetabolicStages {
             shortSummary = "Digesting recent meals and transporting glucose and amino acids into cells.",
             physiologicalProcess = "Following food intake, circulating blood glucose rises. The pancreas secretes insulin to transport glucose into cells for immediate energy and store excess in the liver and muscle tissue as glycogen.",
             primaryFuelSource = "Ingested glucose and dietary macronutrients",
+            biomarkers = StageBiomarkers(
+                bloodSugar = "Rising ↗",
+                insulin = "High / Spiking ↗",
+                ketones = "0.0 mmol/L (Baseline)",
+                autophagy = "Inhibited (mTOR on)",
+                growthHormone = "Baseline"
+            ),
             keyBenefits = listOf(
                 "Active nutrient absorption into cells",
                 "Replenishment of liver and muscle glycogen stores",
@@ -51,6 +67,13 @@ object FastingMetabolicStages {
             shortSummary = "Digestion finishes, insulin falls to baseline, and the liver breaks down stored glycogen.",
             physiologicalProcess = "Gastrointestinal tract completes digestion. Circulating insulin drops toward baseline, signaling the liver to break down glycogen stores into glucose (glycogenolysis) to keep blood sugar stable.",
             primaryFuelSource = "Stored liver glycogen (carbohydrate stores)",
+            biomarkers = StageBiomarkers(
+                bloodSugar = "Declining to Normal ↘",
+                insulin = "Falling toward Baseline ↘",
+                ketones = "0.1 mmol/L (Trace)",
+                autophagy = "Dormant",
+                growthHormone = "Baseline"
+            ),
             keyBenefits = listOf(
                 "Insulin returns to resting baseline",
                 "Gastrointestinal tract rests from active digestion",
@@ -70,6 +93,13 @@ object FastingMetabolicStages {
             shortSummary = "Liver glycogen runs low; hormone-sensitive lipase activates to release stored body fat.",
             physiologicalProcess = "With liver glycogen reserves significantly diminished, the body activates hormone-sensitive lipase (HSL). Triglycerides from adipose tissue are cleaved into free fatty acids and glycerol to fuel muscles.",
             primaryFuelSource = "Body fat stores & free fatty acids (transitioning)",
+            biomarkers = StageBiomarkers(
+                bloodSugar = "Stable Basal 🟢",
+                insulin = "Low Baseline 📉",
+                ketones = "0.2 – 0.5 mmol/L (Mild)",
+                autophagy = "Priming",
+                growthHormone = "Rising (+50%) ↗"
+            ),
             keyBenefits = listOf(
                 "Hormone-sensitive lipase activates fat release",
                 "Stored body fat mobilised as fuel",
@@ -89,6 +119,13 @@ object FastingMetabolicStages {
             shortSummary = "The liver produces ketone bodies (BHB) for clean fuel, boosting focus and fat burning.",
             physiologicalProcess = "With low insulin and depleted glycogen, the liver ramps up beta-oxidation of fatty acids, creating ketone bodies (acetoacetate and beta-hydroxybutyrate). Ketones cross the blood-brain barrier for high-efficiency neuronal energy.",
             primaryFuelSource = "Ketone bodies & free fatty acids",
+            biomarkers = StageBiomarkers(
+                bloodSugar = "Low Stable 🟢",
+                insulin = "Minimal / Suppressed 📉",
+                ketones = "0.5 – 1.5 mmol/L (Nutritional Ketosis)",
+                autophagy = "Initiating 🧬",
+                growthHormone = "+100% – +200% ↗"
+            ),
             keyBenefits = listOf(
                 "Nutritional ketosis activated (BHB & Acetoacetate)",
                 "Enhanced mental clarity and sustained energy",
@@ -109,6 +146,13 @@ object FastingMetabolicStages {
             shortSummary = "Cells recycle damaged components, clearing out senescent cells and misfolded proteins.",
             physiologicalProcess = "AMP-activated protein kinase (AMPK) increases while mTOR is suppressed. Cells initiate autophagy ('self-eating'), delivering damaged organelles, oxidized proteins, and cellular debris to lysosomes for recycling into fresh building blocks.",
             primaryFuelSource = "Ketones and cellular recycled constituents",
+            biomarkers = StageBiomarkers(
+                bloodSugar = "Depleted Baseline 🟢",
+                insulin = "Near-Zero 📉",
+                ketones = "1.5 – 2.5 mmol/L (Elevated)",
+                autophagy = "Peak Cellular Cleanup 🧬🔥",
+                growthHormone = "+300% Surge 🚀"
+            ),
             keyBenefits = listOf(
                 "Cellular housekeeping and damaged organelle recycling",
                 "Downregulation of systemic inflammation markers",
@@ -129,6 +173,13 @@ object FastingMetabolicStages {
             shortSummary = "HGH increases up to 5x to preserve muscle while fat oxidation operates at maximum capacity.",
             physiologicalProcess = "To protect lean muscle tissue and maintain bone mineral density during prolonged fasting, the pituitary gland surges Human Growth Hormone (HGH) secretion by up to 500%. Liver gluconeogenesis runs steadily from glycerol and amino acids.",
             primaryFuelSource = "Deep ketone concentrations & fatty acids",
+            biomarkers = StageBiomarkers(
+                bloodSugar = "Endogenous Gluconeogenesis 🟢",
+                insulin = "Baseline Floor 📉",
+                ketones = "2.5 – 3.5 mmol/L (Deep Ketosis)",
+                autophagy = "Sustained Deep Recycling 🧬",
+                growthHormone = "Up to +500% Peak 👑"
+            ),
             keyBenefits = listOf(
                 "Human Growth Hormone (HGH) rises up to 500%",
                 "Protection of lean muscle mass and bone density",
@@ -149,6 +200,13 @@ object FastingMetabolicStages {
             shortSummary = "Damaged white blood cells are recycled, signaling stem cells to regenerate fresh immune cells.",
             physiologicalProcess = "Extended fasting induces degradation of older, damaged immune cells (white blood cells) and lowers circulating IGF-1. Refeeding triggers hematopoietic stem cells to generate a rejuvenated immune population.",
             primaryFuelSource = "Sustained high-level ketone oxidation",
+            biomarkers = StageBiomarkers(
+                bloodSugar = "Stable Basal (Liver Ketogenesis) 🟢",
+                insulin = "Baseline Floor 📉",
+                ketones = "3.5+ mmol/L (Maximum Fasting Ketosis)",
+                autophagy = "Deep Stem Cell Cleansing 🛡️",
+                growthHormone = "Elevated Anabolic Reserve"
+            ),
             keyBenefits = listOf(
                 "Recycling of damaged and aged immune cells",
                 "Hematopoietic stem cell stimulation for immune renewal",
@@ -172,3 +230,4 @@ object FastingMetabolicStages {
         }
     }
 }
+

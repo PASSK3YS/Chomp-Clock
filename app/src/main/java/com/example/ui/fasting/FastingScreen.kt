@@ -8,6 +8,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Tune
@@ -23,7 +24,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.data.local.entity.FastSession
 import com.example.data.repository.UserPreferences
+import com.example.ui.components.AchievementsDialog
 import com.example.ui.components.AvatarPickerDialog
 import com.example.ui.components.UserAvatarView
 import com.example.ui.settings.SettingsViewModel
@@ -42,12 +45,14 @@ fun FastingScreen(
     val pastSessions by viewModel.pastSessions.collectAsState()
     val streak by viewModel.currentStreak.collectAsState()
     val achievements by viewModel.achievements.collectAsState()
+    val detailedAchievements by viewModel.detailedAchievements.collectAsState()
 
     var showLogPastDialog by remember { mutableStateOf(false) }
     var showAchievementsDialog by remember { mutableStateOf(false) }
     var showCustomFastDialog by remember { mutableStateOf(false) }
     var showAvatarPicker by remember { mutableStateOf(false) }
     var showMetabolicStatesDialog by remember { mutableStateOf(false) }
+    var fastToDelete by remember { mutableStateOf<FastSession?>(null) }
 
     val username = userPrefs?.username ?: "User"
     val avatarId = userPrefs?.avatarId
@@ -87,34 +92,40 @@ fun FastingScreen(
     }
 
     if (showAchievementsDialog) {
+        AchievementsDialog(
+            achievements = detailedAchievements,
+            onDismiss = { showAchievementsDialog = false }
+        )
+    }
+
+    if (fastToDelete != null) {
+        val session = fastToDelete!!
+        val durationHrs = (session.endTime - session.startTime) / (1000 * 3600f)
+        val dateStr = SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.getDefault()).format(Date(session.startTime))
         AlertDialog(
-            onDismissRequest = { showAchievementsDialog = false },
-            title = { Text("Achievements", color = Color.White, fontWeight = FontWeight.Bold) },
+            onDismissRequest = { fastToDelete = null },
+            title = { Text("Delete Fast Record", color = Color.White, fontWeight = FontWeight.Bold) },
             text = {
-                Column {
-                    achievements.forEach { ach ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(if (ach.isUnlocked) "🏆" else "🔒", fontSize = 20.sp)
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Column {
-                                Text(ach.title, fontWeight = FontWeight.Bold, color = if (ach.isUnlocked) Color.White else Color(0xFF71717A))
-                                Text(ach.description, style = MaterialTheme.typography.bodySmall, color = Color(0xFFA1A1AA))
-                            }
-                        }
-                    }
-                }
+                Text(
+                    "Are you sure you want to delete this completed fast of ${String.format(Locale.getDefault(), "%.1f", durationHrs)} hrs recorded on $dateStr? This action cannot be undone.",
+                    color = Color(0xFFA1A1AA),
+                    fontSize = 14.sp
+                )
             },
             confirmButton = {
                 Button(
-                    onClick = { showAchievementsDialog = false },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3B82F6))
+                    onClick = {
+                        viewModel.deleteSession(session)
+                        fastToDelete = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDC2626))
                 ) {
-                    Text("Close")
+                    Text("Delete", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { fastToDelete = null }) {
+                    Text("Cancel", color = Color(0xFFA1A1AA))
                 }
             },
             containerColor = Color(0xFF18181B),
@@ -455,12 +466,12 @@ fun FastingScreen(
                         ) {
                             Row(
                                 modifier = Modifier
-                                    .padding(12.dp)
+                                    .padding(start = 12.dp, top = 8.dp, bottom = 8.dp, end = 4.dp)
                                     .fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Column {
+                                Column(modifier = Modifier.weight(1f)) {
                                     Text(
                                         dateFormat.format(Date(session.startTime)),
                                         fontWeight = FontWeight.Medium,
@@ -473,18 +484,32 @@ fun FastingScreen(
                                         color = Color(0xFF71717A)
                                     )
                                 }
-                                Surface(
-                                    shape = RoundedCornerShape(8.dp),
-                                    color = if (hitGoal) Color(0xFF064E3B) else Color(0xFF27272A),
-                                    border = BorderStroke(1.dp, if (hitGoal) Color(0xFF059669) else Color(0xFF3F3F46))
-                                ) {
-                                    Text(
-                                        text = "${String.format(Locale.getDefault(), "%.1f", durationHrs)} hrs ${if (hitGoal) "✓" else ""}",
-                                        color = if (hitGoal) Color(0xFF34D399) else Color(0xFFA1A1AA),
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 12.sp,
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                    )
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Surface(
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = if (hitGoal) Color(0xFF064E3B) else Color(0xFF27272A),
+                                        border = BorderStroke(1.dp, if (hitGoal) Color(0xFF059669) else Color(0xFF3F3F46))
+                                    ) {
+                                        Text(
+                                            text = "${String.format(Locale.getDefault(), "%.1f", durationHrs)} hrs ${if (hitGoal) "✓" else ""}",
+                                            color = if (hitGoal) Color(0xFF34D399) else Color(0xFFA1A1AA),
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 12.sp,
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    IconButton(
+                                        onClick = { fastToDelete = session },
+                                        modifier = Modifier.size(32.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.DeleteOutline,
+                                            contentDescription = "Delete fast log",
+                                            tint = Color(0xFF71717A),
+                                            modifier = Modifier.size(17.dp)
+                                        )
+                                    }
                                 }
                             }
                         }

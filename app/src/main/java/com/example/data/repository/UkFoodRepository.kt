@@ -126,9 +126,14 @@ class UkFoodRepository(
 
     suspend fun lookupBarcode(barcode: String): FoodSearchResult? = withContext(Dispatchers.IO) {
         val trimmedCode = barcode.trim()
+        if (trimmedCode.isBlank()) return@withContext null
 
         // 1. Check local catalog first
-        val local = UkFoodCatalog.items.firstOrNull { it.barcode == trimmedCode }
+        val local = UkFoodCatalog.items.firstOrNull { 
+            it.barcode == trimmedCode || 
+            (trimmedCode.length == 12 && it.barcode == "0$trimmedCode") ||
+            (trimmedCode.startsWith("0") && it.barcode == trimmedCode.drop(1))
+        }
         if (local != null) {
             return@withContext FoodSearchResult(
                 id = local.id,
@@ -146,41 +151,97 @@ class UkFoodRepository(
             )
         }
 
-        // 2. Query Open Food Facts API for the barcode
-        try {
-            val response = api.getProduct(trimmedCode)
-            if (response.status == 1 && response.product != null) {
+        // 2. Query Open Food Facts API for the barcode (with fallback barcode variants)
+        val codesToTry = mutableListOf(trimmedCode)
+        if (trimmedCode.length == 12) codesToTry.add("0$trimmedCode")
+        if (trimmedCode.startsWith("0") && trimmedCode.length == 13) codesToTry.add(trimmedCode.drop(1))
+
+        for (code in codesToTry) {
+            try {
+                val response = api.getProduct(code)
                 val prod = response.product
-                val name = prod.productName ?: prod.productNameEn ?: "Product #$trimmedCode"
-                val brand = prod.brands?.split(",")?.firstOrNull()?.trim() ?: "UK Brand"
-                val cal100g = prod.nutriments?.energyKcal100g?.toInt()
-                    ?: prod.nutriments?.energyKcal?.toInt()
-                    ?: 180
-                val serving = prod.servingSize?.trim() ?: "1 serving (100g)"
-                val calServing = prod.nutriments?.energyKcalServing?.toInt() ?: cal100g
+                if (prod != null) {
+                    val brand = prod.brands?.split(",")?.firstOrNull()?.trim()
+                        ?: prod.brandsTags?.firstOrNull()?.replace("-", " ")?.replaceFirstChar { it.uppercase() }
+                        ?: "UK Product"
 
-                val prot = (prod.nutriments?.proteins100g ?: 0.0).toFloat()
-                val carbs = (prod.nutriments?.carbohydrates100g ?: 0.0).toFloat()
-                val fat = (prod.nutriments?.fat100g ?: 0.0).toFloat()
+                    // Extract best available Product Name
+                    val rawName = listOfNotNull(
+                        prod.productName?.takeIf { it.isNotBlank() },
+                        prod.productNameEn?.takeIf { it.isNotBlank() },
+                        prod.genericName?.takeIf { it.isNotBlank() },
+                        prod.genericNameEn?.takeIf { it.isNotBlank() },
+                        prod.abbreviatedProductName?.takeIf { it.isNotBlank() }
+                    ).firstOrNull()
 
-                return@withContext FoodSearchResult(
-                    id = prod.code ?: trimmedCode,
-                    name = name,
-                    brandOrSupermarket = brand,
-                    category = prod.genericName ?: "Scanned Product",
-                    caloriesPerServing = calServing,
-                    servingSize = serving,
-                    caloriesPer100g = cal100g,
-                    proteinGrams = prot,
-                    carbsGrams = carbs,
-                    fatGrams = fat,
-                    barcode = trimmedCode,
-                    isUkSupermarket = isUkSupermarketBrand(brand),
-                    imageUrl = prod.imageThumbUrl ?: prod.imageUrl
-                )
+                    val name = when {
+                        rawName != null && brand != "UK Product" && !rawName.contains(brand, ignoreCase = true) -> "$brand $rawName"
+                        rawName != null -> rawName
+                        brand != "UK Product" -> "$brand Item (#$code)"
+                        else -> "Food Item (#$code)"
+                    }
+
+                    // Extract accurate Calorie Information
+                    val nutriments = prod.nutriments
+                    val cal100g = (nutriments?.energyKcal100g 
+                        ?: nutriments?.energyKcal 
+                        ?: nutriments?.energyKcalValue 
+                        ?: (nutriments?.energy100g?.let { it / 4.184 })
+                        ?: (nutriments?.energy?.let { it / 4.184 })
+                        ?: 150.0).toInt()
+
+                    // Parse serving size & compute exact serving calories
+                    val servingText = prod.servingSize?.trim()?.takeIf { it.isNotBlank() } ?: "1 serving (100g)"
+                    val gramsInServing = prod.servingQuantity 
+                        ?: Regex("""(\d+(?:\.\d+)?)\s*(?:g|ml|grams|millilitres|g\b|ml\b)""", RegexOption.IGNORE_CASE)
+                            .find(servingText)?.groupValues?.get(1)?.toDoubleOrNull()
+
+                    val calServing = when {
+                        nutriments?.energyKcalServing != null && nutriments.energyKcalServing > 0 -> {
+                            nutriments.energyKcalServing.toInt()
+                        }
+                        nutriments?.energyServing != null && nutriments.energyServing > 0 -> {
+                            (nutriments.energyServing / 4.184).toInt()
+                        }
+                        gramsInServing != null && gramsInServing > 0 -> {
+                            kotlin.math.round(cal100g * (gramsInServing / 100.0)).toInt()
+                        }
+                        else -> cal100g
+                    }
+
+                    val prot = (nutriments?.proteinsServing 
+                        ?: (if (gramsInServing != null) (nutriments?.proteins100g ?: 0.0) * gramsInServing / 100.0 else nutriments?.proteins100g)
+                        ?: 0.0).toFloat()
+                    val carbs = (nutriments?.carbohydratesServing 
+                        ?: (if (gramsInServing != null) (nutriments?.carbohydrates100g ?: 0.0) * gramsInServing / 100.0 else nutriments?.carbohydrates100g)
+                        ?: 0.0).toFloat()
+                    val fat = (nutriments?.fatServing 
+                        ?: (if (gramsInServing != null) (nutriments?.fat100g ?: 0.0) * gramsInServing / 100.0 else nutriments?.fat100g)
+                        ?: 0.0).toFloat()
+
+                    val category = prod.genericName?.takeIf { it.isNotBlank() }
+                        ?: prod.categories?.split(",")?.firstOrNull()?.trim()
+                        ?: "Scanned Product"
+
+                    return@withContext FoodSearchResult(
+                        id = prod.code ?: code,
+                        name = name,
+                        brandOrSupermarket = brand,
+                        category = category,
+                        caloriesPerServing = maxOf(0, calServing),
+                        servingSize = servingText,
+                        caloriesPer100g = maxOf(0, cal100g),
+                        proteinGrams = maxOf(0f, prot),
+                        carbsGrams = maxOf(0f, carbs),
+                        fatGrams = maxOf(0f, fat),
+                        barcode = code,
+                        isUkSupermarket = isUkSupermarketBrand(brand),
+                        imageUrl = prod.imageThumbUrl ?: prod.imageFrontUrl ?: prod.imageUrl
+                    )
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
             }
-        } catch (e: Exception) {
-            e.printStackTrace()
         }
 
         null

@@ -8,13 +8,10 @@ import androidx.lifecycle.viewModelScope
 import com.example.FastingService
 import com.example.data.local.AppDatabase
 import com.example.data.local.entity.FastSession
+import com.example.data.model.DetailedAchievement
+import com.example.util.AchievementEngine
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
 class FastingViewModel(application: Application) : AndroidViewModel(application) {
@@ -40,11 +37,22 @@ class FastingViewModel(application: Application) : AndroidViewModel(application)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val currentStreak = pastSessions.map { sessions ->
-        if (sessions.isEmpty()) 0 else {
-            // Count unique days or total completed sessions
-            sessions.size
-        }
+        if (sessions.isEmpty()) 0 else sessions.size
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
+
+    val detailedAchievements: StateFlow<List<DetailedAchievement>> = combine(
+        pastSessions,
+        db.weightEntryDao().getAllEntries(),
+        db.foodEntryDao().getAllEntries(),
+        currentStreak
+    ) { sessions, weights, foods, streak ->
+        AchievementEngine.computeAchievements(
+            fastSessions = sessions,
+            weightEntries = weights,
+            foodEntries = foods,
+            currentStreakDays = streak
+        )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     init {
         viewModelScope.launch {
@@ -114,6 +122,12 @@ class FastingViewModel(application: Application) : AndroidViewModel(application)
                     durationTargetMillis = targetDurationMillis
                 )
             )
+        }
+    }
+
+    fun deleteSession(session: FastSession) {
+        viewModelScope.launch {
+            dao.deleteSession(session)
         }
     }
 }

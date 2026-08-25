@@ -966,7 +966,7 @@ fun SettingsScreen(
 
         Spacer(modifier = Modifier.height(28.dp))
         Text(
-            text = "Chomp Clock - v1.0.0",
+            text = "Chomp Clock - v1.1.0",
             modifier = Modifier.align(Alignment.CenterHorizontally),
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.SemiBold,

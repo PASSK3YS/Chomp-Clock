@@ -18,15 +18,21 @@ class WeightViewModel(application: Application) : AndroidViewModel(application) 
     val weightEntries: StateFlow<List<WeightEntry>> = dao.getAllEntries()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    fun addWeightEntry(weightKg: Float, waistCm: Float?) {
+    fun addWeightEntry(weightKg: Float, waistCm: Float?, date: Long = System.currentTimeMillis()) {
         viewModelScope.launch {
             dao.insertEntry(
                 WeightEntry(
                     weightKg = weightKg,
                     waistCm = waistCm,
-                    date = System.currentTimeMillis()
+                    date = date
                 )
             )
+        }
+    }
+
+    fun deleteWeightEntry(entry: WeightEntry) {
+        viewModelScope.launch {
+            dao.deleteEntry(entry)
         }
     }
     
