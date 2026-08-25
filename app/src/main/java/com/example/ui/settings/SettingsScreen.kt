@@ -1264,13 +1264,14 @@ fun SettingsScreen(
                             .background(Color(0xFF27272A).copy(alpha = 0.5f), RoundedCornerShape(10.dp))
                             .padding(12.dp)
                     ) {
+                        Text("• v1.1.2: Data Backup & Restore (.JSON / .CSV) with merge & replace options", color = Color(0xFFA1A1AA), fontSize = 12.sp)
+                        Text("• v1.1.2: Expanded UK Supermarket Cereals, Dinner combos & Snacks catalog", color = Color(0xFFA1A1AA), fontSize = 12.sp)
+                        Text("• v1.1.2: Adaptive high-contrast system status bar icons (White in Dark, Dark in Light)", color = Color(0xFFA1A1AA), fontSize = 12.sp)
                         Text("• v1.1.1: Interactive 7-Stage Metabolic Science & Biomarker Telemetry Guide", color = Color(0xFFA1A1AA), fontSize = 12.sp)
                         Text("• v1.1.1: Streamlined compact Fasting Dashboard layout", color = Color(0xFFA1A1AA), fontSize = 12.sp)
-                        Text("• v1.1.1: GitHub Actions CI build & release workflow fixes", color = Color(0xFFA1A1AA), fontSize = 12.sp)
-                        Text("• UK Supermarket Food Database (Tesco, Sainsbury's, ASDA, M&S, Morrisons, Aldi, Lidl)", color = Color(0xFFA1A1AA), fontSize = 12.sp)
-                        Text("• UK Barcode scanning with instant product nutrition autofill", color = Color(0xFFA1A1AA), fontSize = 12.sp)
-                        Text("• Stone & Pounds (st & lbs), Pounds, and KG unit switcher", color = Color(0xFFA1A1AA), fontSize = 12.sp)
-                        Text("• Custom fasting duration picker with hours and minutes", color = Color(0xFFA1A1AA), fontSize = 12.sp)
+                        Text("• v1.1.0: UK Barcode scanning with instant product nutrition autofill", color = Color(0xFFA1A1AA), fontSize = 12.sp)
+                        Text("• v1.1.0: Stone & Pounds (st & lbs), Pounds, and KG unit switcher", color = Color(0xFFA1A1AA), fontSize = 12.sp)
+                        Text("• v1.1.0: Custom fasting duration picker with hours and minutes", color = Color(0xFFA1A1AA), fontSize = 12.sp)
                     }
                 }
             }

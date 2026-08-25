@@ -11,6 +11,8 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.data.repository.UserPreferences
+import com.example.data.repository.WeightUnit
 import com.example.ui.MainScreen
 import com.example.ui.settings.SettingsViewModel
 import com.example.ui.theme.MyApplicationTheme
@@ -18,29 +20,33 @@ import com.example.ui.theme.MyApplicationTheme
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        savedEdgeToEdge()
+        enableEdgeToEdge()
         
         setContent {
             val settingsViewModel: SettingsViewModel = viewModel()
             val userPrefs by settingsViewModel.userPrefs.collectAsState()
+            val activePrefs = userPrefs ?: UserPreferences(
+                username = "User",
+                heightCm = 170f,
+                gender = "Male",
+                weightUnit = WeightUnit.KG,
+                useImperial = false,
+                useDarkTheme = true,
+                soundsEnabled = true,
+                avatarId = "icon:🔥"
+            )
 
             MyApplicationTheme(
-                darkTheme = userPrefs?.useDarkTheme ?: true
+                darkTheme = activePrefs.useDarkTheme
             ) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    if (userPrefs != null) {
-                        MainScreen(userPrefs!!)
-                    }
+                    MainScreen(activePrefs)
                 }
             }
         }
     }
-    
-    // We create a helper function for Edge to Edge manually if needed or just rely on ComponentActivity.
-    private fun savedEdgeToEdge() {
-        enableEdgeToEdge()
-    }
 }
+

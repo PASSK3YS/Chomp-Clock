@@ -54,8 +54,21 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     private val gitHubService = GitHubService.create()
     val backupManager = DataBackupManager(application)
     
-    val userPrefs: StateFlow<UserPreferences?> = repository.userPreferencesFlow
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+    val userPrefs: StateFlow<UserPreferences> = repository.userPreferencesFlow
+        .stateIn(
+            viewModelScope,
+            SharingStarted.Eagerly,
+            UserPreferences(
+                username = "User",
+                heightCm = 170f,
+                gender = "Male",
+                weightUnit = WeightUnit.KG,
+                useImperial = false,
+                useDarkTheme = true,
+                soundsEnabled = true,
+                avatarId = "icon:🔥"
+            )
+        )
 
     private val _updateCheckState = MutableStateFlow<UpdateCheckState>(UpdateCheckState.Idle)
     val updateCheckState: StateFlow<UpdateCheckState> = _updateCheckState.asStateFlow()
