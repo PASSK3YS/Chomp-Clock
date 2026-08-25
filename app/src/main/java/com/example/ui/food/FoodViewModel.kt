@@ -5,38 +5,101 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.local.AppDatabase
 import com.example.data.local.entity.FoodEntry
-import com.example.data.remote.OpenFoodFactsApi
+import com.example.data.repository.FoodSearchResult
+import com.example.data.repository.UkFoodRepository
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import retrofit2.Retrofit
-import retrofit2.converter.moshi.MoshiConverterFactory
+
+sealed class BarcodeLookupState {
+    object Idle : BarcodeLookupState()
+    object Loading : BarcodeLookupState()
+    data class Success(val food: FoodSearchResult) : BarcodeLookupState()
+    data class NotFound(val barcode: String) : BarcodeLookupState()
+    data class Error(val message: String) : BarcodeLookupState()
+}
 
 class FoodViewModel(application: Application) : AndroidViewModel(application) {
     private val db = AppDatabase.getDatabase(application)
     private val dao = db.foodEntryDao()
-
-    private val api: OpenFoodFactsApi by lazy {
-        Retrofit.Builder()
-            .baseUrl("https://world.openfoodfacts.org/")
-            .addConverterFactory(MoshiConverterFactory.create())
-            .build()
-            .create(OpenFoodFactsApi::class.java)
-    }
+    private val repository = UkFoodRepository()
 
     val foodEntries: StateFlow<List<FoodEntry>> = dao.getAllEntries()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    fun addFoodEntry(name: String, servingSize: String, calories: Int, mealType: String) {
+    // Search state
+    private val _searchQuery = MutableStateFlow("")
+    val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
+
+    private val _selectedSupermarket = MutableStateFlow("All")
+    val selectedSupermarket: StateFlow<String> = _selectedSupermarket.asStateFlow()
+
+    private val _searchResults = MutableStateFlow<List<FoodSearchResult>>(emptyList())
+    val searchResults: StateFlow<List<FoodSearchResult>> = _searchResults.asStateFlow()
+
+    private val _isSearching = MutableStateFlow(false)
+    val isSearching: StateFlow<Boolean> = _isSearching.asStateFlow()
+
+    // Barcode Lookup State
+    private val _barcodeLookupState = MutableStateFlow<BarcodeLookupState>(BarcodeLookupState.Idle)
+    val barcodeLookupState: StateFlow<BarcodeLookupState> = _barcodeLookupState.asStateFlow()
+
+    private var searchJob: Job? = null
+
+    init {
+        // Initial popular UK items list
+        viewModelScope.launch {
+            performSearch("", "All")
+        }
+    }
+
+    fun onSearchQueryChanged(newQuery: String) {
+        _searchQuery.value = newQuery
+        searchJob?.cancel()
+        searchJob = viewModelScope.launch {
+            _isSearching.value = true
+            delay(250) // Debounce typing
+            performSearch(newQuery, _selectedSupermarket.value)
+            _isSearching.value = false
+        }
+    }
+
+    fun onSupermarketFilterChanged(supermarket: String) {
+        _selectedSupermarket.value = supermarket
+        searchJob?.cancel()
+        searchJob = viewModelScope.launch {
+            _isSearching.value = true
+            performSearch(_searchQuery.value, supermarket)
+            _isSearching.value = false
+        }
+    }
+
+    private suspend fun performSearch(query: String, supermarket: String) {
+        val results = repository.searchFood(query, supermarket)
+        _searchResults.value = results
+    }
+
+    fun addFoodEntry(
+        name: String,
+        servingSize: String,
+        calories: Int,
+        mealType: String,
+        barcode: String? = null
+    ) {
         viewModelScope.launch {
             dao.insertEntry(
                 FoodEntry(
                     name = name.trim().ifEmpty { "Food item" },
                     servingSize = servingSize.trim().ifEmpty { "1 serving" },
-                    calories = calories,
+                    calories = maxOf(0, calories),
                     mealType = mealType,
-                    date = System.currentTimeMillis()
+                    date = System.currentTimeMillis(),
+                    barcode = barcode
                 )
             )
         }
@@ -47,54 +110,27 @@ class FoodViewModel(application: Application) : AndroidViewModel(application) {
             dao.deleteEntry(entry)
         }
     }
-    
-    fun scanBarcode(barcode: String, mealType: String, onResult: (Boolean, String) -> Unit = { _, _ -> }) {
+
+    fun scanBarcodeAndLookup(barcode: String, onResult: (FoodSearchResult?) -> Unit) {
+        _barcodeLookupState.value = BarcodeLookupState.Loading
         viewModelScope.launch {
             try {
-                val response = api.getProduct(barcode)
-                if (response.status == 1 && response.product != null) {
-                    val name = response.product.productName ?: "Scanned Product ($barcode)"
-                    val cal = response.product.nutriments?.energyKcal100g?.toInt() ?: 150
-                    dao.insertEntry(
-                        FoodEntry(
-                            name = name,
-                            servingSize = "100g",
-                            calories = cal,
-                            mealType = mealType,
-                            date = System.currentTimeMillis(),
-                            barcode = barcode
-                        )
-                    )
-                    onResult(true, name)
+                val result = repository.lookupBarcode(barcode)
+                if (result != null) {
+                    _barcodeLookupState.value = BarcodeLookupState.Success(result)
+                    onResult(result)
                 } else {
-                    // Fallback entry if not found in open database
-                    dao.insertEntry(
-                        FoodEntry(
-                            name = "Barcode #$barcode",
-                            servingSize = "1 item",
-                            calories = 200,
-                            mealType = mealType,
-                            date = System.currentTimeMillis(),
-                            barcode = barcode
-                        )
-                    )
-                    onResult(true, "Barcode #$barcode")
+                    _barcodeLookupState.value = BarcodeLookupState.NotFound(barcode)
+                    onResult(null)
                 }
             } catch (e: Exception) {
-                e.printStackTrace()
-                // Graceful fallback
-                dao.insertEntry(
-                    FoodEntry(
-                        name = "Scanned Item ($barcode)",
-                        servingSize = "1 item",
-                        calories = 180,
-                        mealType = mealType,
-                        date = System.currentTimeMillis(),
-                        barcode = barcode
-                    )
-                )
-                onResult(false, e.localizedMessage ?: "Network error")
+                _barcodeLookupState.value = BarcodeLookupState.Error(e.localizedMessage ?: "Failed to lookup barcode")
+                onResult(null)
             }
         }
+    }
+
+    fun clearBarcodeState() {
+        _barcodeLookupState.value = BarcodeLookupState.Idle
     }
 }

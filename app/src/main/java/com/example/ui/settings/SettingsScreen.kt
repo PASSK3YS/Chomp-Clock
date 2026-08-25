@@ -1,5 +1,7 @@
 package com.example.ui.settings
 
+import android.content.Intent
+import android.net.Uri
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
@@ -21,6 +23,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -28,8 +31,6 @@ import com.example.data.repository.UserPreferences
 import com.example.data.repository.WeightUnit
 import com.example.ui.components.AvatarPickerDialog
 import com.example.ui.components.UserAvatarView
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 
 @Composable
 fun SettingsScreen(
@@ -37,7 +38,7 @@ fun SettingsScreen(
     viewModel: SettingsViewModel = viewModel()
 ) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
+    val updateCheckState by viewModel.updateCheckState.collectAsState()
 
     val p = userPrefs ?: UserPreferences("User", 170f, "Male", WeightUnit.KG, false, true, true)
     var editName by remember(p.username) { mutableStateOf(p.username) }
@@ -45,9 +46,7 @@ fun SettingsScreen(
 
     var showAvatarPicker by remember { mutableStateOf(false) }
     var showDeleteConfirmDialog by remember { mutableStateOf(false) }
-    var isCheckingUpdates by remember { mutableStateOf(false) }
-    var updateCheckResult by remember { mutableStateOf<String?>(null) }
-    var showReleaseNotes by remember { mutableStateOf(false) }
+    var showWhatsNewDialog by remember { mutableStateOf(false) }
 
     if (showAvatarPicker) {
         AvatarPickerDialog(
@@ -105,34 +104,38 @@ fun SettingsScreen(
             dismissButton = {
                 OutlinedButton(
                     onClick = { showDeleteConfirmDialog = false },
-                    border = BorderStroke(1.dp, Color(0xFF3F3F46)),
-                    shape = RoundedCornerShape(10.dp)
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+                    border = BorderStroke(1.dp, Color(0xFF3F3F46))
                 ) {
-                    Text("Cancel", color = Color.White)
+                    Text("Cancel")
                 }
             },
-            containerColor = Color(0xFF18181B),
-            shape = RoundedCornerShape(20.dp)
+            containerColor = Color(0xFF18181B)
         )
     }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 24.dp, vertical = 16.dp)
             .verticalScroll(rememberScrollState())
+            .padding(horizontal = 24.dp, vertical = 20.dp)
     ) {
-        // Top Header
         Text(
-            text = "SETTINGS & PREFERENCES",
-            style = MaterialTheme.typography.labelSmall,
-            color = Color(0xFF71717A),
+            text = "Settings",
+            style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Bold,
-            letterSpacing = 1.2.sp
+            color = Color.White
         )
-        Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            text = "Manage profile, measurement units & updates",
+            style = MaterialTheme.typography.bodyMedium,
+            color = Color(0xFF71717A)
+        )
 
-        // 1. USER PROFILE SECTION
+        Spacer(modifier = Modifier.height(20.dp))
+
+        // 1. PROFILE & AVATAR SECTION
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(18.dp),
@@ -141,32 +144,33 @@ fun SettingsScreen(
         ) {
             Column(modifier = Modifier.padding(18.dp)) {
                 Text(
-                    text = "USER PROFILE",
+                    text = "PROFILE & AVATAR",
                     style = MaterialTheme.typography.labelSmall,
                     color = Color(0xFF71717A),
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 1.sp
                 )
-                Spacer(modifier = Modifier.height(16.dp))
 
-                // Avatar preview + change button
+                Spacer(modifier = Modifier.height(14.dp))
+
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Box(contentAlignment = Alignment.BottomEnd) {
+                    Box {
                         UserAvatarView(
                             avatarId = p.avatarId,
                             size = 64.dp,
                             onClick = { showAvatarPicker = true }
                         )
                         Surface(
+                            onClick = { showAvatarPicker = true },
                             shape = CircleShape,
                             color = Color(0xFF3B82F6),
-                            border = BorderStroke(1.5.dp, Color(0xFF18181B)),
+                            border = BorderStroke(2.dp, Color(0xFF18181B)),
                             modifier = Modifier
-                                .size(22.dp)
-                                .clickable { showAvatarPicker = true }
+                                .size(24.dp)
+                                .align(Alignment.BottomEnd)
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 Icon(
@@ -183,15 +187,21 @@ fun SettingsScreen(
 
                     Column {
                         Text(
-                            text = p.username,
-                            color = Color.White,
+                            text = p.username.ifEmpty { "User" },
+                            style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
-                            fontSize = 16.sp
+                            color = Color.White
                         )
                         Text(
+                            text = "${p.gender} • ${p.heightCm.toInt()} cm",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color(0xFFA1A1AA)
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
                             text = "Tap avatar to change icon or photo",
+                            style = MaterialTheme.typography.labelSmall,
                             color = Color(0xFF60A5FA),
-                            fontSize = 12.sp,
                             modifier = Modifier.clickable { showAvatarPicker = true }
                         )
                     }
@@ -206,63 +216,74 @@ fun SettingsScreen(
                         viewModel.updateUsername(it)
                     },
                     label = { Text("Display Name") },
+                    singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     colors = OutlinedTextFieldDefaults.colors(
-                        unfocusedContainerColor = Color(0xFF27272A),
+                        focusedBorderColor = Color(0xFF3B82F6),
+                        unfocusedBorderColor = Color(0xFF27272A),
                         focusedContainerColor = Color(0xFF27272A),
-                        unfocusedBorderColor = Color(0xFF3F3F46),
-                        focusedBorderColor = Color(0xFF3B82F6)
+                        unfocusedContainerColor = Color(0xFF27272A)
                     )
                 )
 
                 Spacer(modifier = Modifier.height(10.dp))
 
-                OutlinedTextField(
-                    value = editHeight,
-                    onValueChange = {
-                        if (it.all { char -> char.isDigit() }) {
-                            editHeight = it
-                            it.toFloatOrNull()?.let { h -> viewModel.updateHeight(h) }
-                        }
-                    },
-                    label = { Text("Height (cm)") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                Row(
                     modifier = Modifier.fillMaxWidth(),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        unfocusedContainerColor = Color(0xFF27272A),
-                        focusedContainerColor = Color(0xFF27272A),
-                        unfocusedBorderColor = Color(0xFF3F3F46),
-                        focusedBorderColor = Color(0xFF3B82F6)
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    OutlinedTextField(
+                        value = editHeight,
+                        onValueChange = {
+                            if (it.all { c -> c.isDigit() } && it.length <= 3) {
+                                editHeight = it
+                                it.toFloatOrNull()?.let { h -> viewModel.updateHeight(h) }
+                            }
+                        },
+                        label = { Text("Height (cm)") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.weight(1f),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Color(0xFF3B82F6),
+                            unfocusedBorderColor = Color(0xFF27272A),
+                            focusedContainerColor = Color(0xFF27272A),
+                            unfocusedContainerColor = Color(0xFF27272A)
+                        )
                     )
-                )
 
-                Spacer(modifier = Modifier.height(14.dp))
-
-                Text(
-                    text = "BIOLOGICAL GENDER",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = Color(0xFF71717A),
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 0.8.sp
-                )
-                Row(modifier = Modifier.padding(top = 6.dp)) {
-                    listOf("Male", "Female").forEach { gender ->
-                        val isSelected = p.gender.equals(gender, ignoreCase = true)
+                    // Gender Selector
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            "Gender",
+                            color = Color(0xFF71717A),
+                            fontSize = 11.sp,
+                            modifier = Modifier.padding(bottom = 4.dp)
+                        )
                         Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier
-                                .clickable { viewModel.updateGender(gender) }
-                                .padding(end = 20.dp)
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
-                            RadioButton(
-                                selected = isSelected,
-                                onClick = { viewModel.updateGender(gender) },
-                                colors = RadioButtonDefaults.colors(
-                                    selectedColor = Color(0xFF3B82F6),
-                                    unselectedColor = Color(0xFF71717A)
-                                )
-                            )
-                            Text(gender, color = Color.White, fontSize = 14.sp)
+                            listOf("Male", "Female").forEach { g ->
+                                val isSelected = p.gender.equals(g, ignoreCase = true)
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = if (isSelected) Color(0xFF3B82F6).copy(alpha = 0.25f) else Color(0xFF27272A),
+                                    border = BorderStroke(1.dp, if (isSelected) Color(0xFF3B82F6) else Color(0xFF3F3F46)),
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(52.dp)
+                                        .clickable { viewModel.updateGender(g) }
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Text(
+                                            text = g,
+                                            color = if (isSelected) Color(0xFF60A5FA) else Color.White,
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -271,7 +292,7 @@ fun SettingsScreen(
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // 2. METRICS & WEIGHT UNITS SECTION (Stone & Pounds / Pounds / KG)
+        // 2. MEASUREMENT & WEIGHT UNITS (Stone & Pounds, Pounds, KG)
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(18.dp),
@@ -280,7 +301,7 @@ fun SettingsScreen(
         ) {
             Column(modifier = Modifier.padding(18.dp)) {
                 Text(
-                    text = "WEIGHT MEASUREMENT UNIT",
+                    text = "MEASUREMENT & UNITS",
                     style = MaterialTheme.typography.labelSmall,
                     color = Color(0xFF71717A),
                     fontWeight = FontWeight.Bold,
@@ -288,38 +309,44 @@ fun SettingsScreen(
                 )
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
-                    text = "Choose your preferred unit for logging and stats display.",
+                    text = "Select preferred weight unit system:",
                     color = Color(0xFFA1A1AA),
-                    fontSize = 12.sp
+                    fontSize = 13.sp
                 )
-                Spacer(modifier = Modifier.height(14.dp))
+
+                Spacer(modifier = Modifier.height(12.dp))
 
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf(
-                        Triple(WeightUnit.KG, "Kilograms (kg)", "e.g. 72.5 kg"),
-                        Triple(WeightUnit.LBS, "Pounds (lbs)", "e.g. 159.8 lbs"),
-                        Triple(WeightUnit.STONE_LBS, "Stone & Pounds (st & lbs)", "e.g. 11 st 5.8 lbs")
-                    ).forEach { (unit, title, example) ->
+                    val unitOptions = listOf(
+                        Triple(WeightUnit.STONE_LBS, "Stone & Pounds (st & lbs)", "British UK standard (e.g. 11 st 4 lbs)"),
+                        Triple(WeightUnit.LBS, "Pounds (lbs)", "US standard (e.g. 158.0 lbs)"),
+                        Triple(WeightUnit.KG, "Kilograms (kg)", "Metric standard (e.g. 71.5 kg)")
+                    )
+
+                    unitOptions.forEach { (unit, title, subtitle) ->
                         val isSelected = p.weightUnit == unit
                         Surface(
                             shape = RoundedCornerShape(12.dp),
-                            color = if (isSelected) Color(0xFF3B82F6).copy(alpha = 0.15f) else Color(0xFF27272A),
+                            color = if (isSelected) Color(0xFF3B82F6).copy(alpha = 0.18f) else Color(0xFF27272A),
                             border = BorderStroke(
-                                1.dp,
-                                if (isSelected) Color(0xFF3B82F6) else Color(0xFF3F3F46)
+                                1.5.dp,
+                                if (isSelected) Color(0xFF3B82F6) else Color(0xFF3F3F46).copy(alpha = 0.5f)
                             ),
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable { viewModel.updateWeightUnit(unit) }
+                                .clickable {
+                                    viewModel.updateWeightUnit(unit)
+                                    viewModel.updateUseImperial(unit != WeightUnit.KG)
+                                }
                         ) {
                             Row(
                                 modifier = Modifier
-                                    .padding(horizontal = 14.dp, vertical = 12.dp)
-                                    .fillMaxWidth(),
+                                    .fillMaxWidth()
+                                    .padding(12.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Column {
+                                Column(modifier = Modifier.weight(1f)) {
                                     Text(
                                         text = title,
                                         color = if (isSelected) Color(0xFF60A5FA) else Color.White,
@@ -327,14 +354,17 @@ fun SettingsScreen(
                                         fontSize = 14.sp
                                     )
                                     Text(
-                                        text = example,
+                                        text = subtitle,
                                         color = Color(0xFF71717A),
-                                        fontSize = 11.sp
+                                        fontSize = 12.sp
                                     )
                                 }
                                 RadioButton(
                                     selected = isSelected,
-                                    onClick = { viewModel.updateWeightUnit(unit) },
+                                    onClick = {
+                                        viewModel.updateWeightUnit(unit)
+                                        viewModel.updateUseImperial(unit != WeightUnit.KG)
+                                    },
                                     colors = RadioButtonDefaults.colors(
                                         selectedColor = Color(0xFF3B82F6),
                                         unselectedColor = Color(0xFF71717A)
@@ -349,7 +379,7 @@ fun SettingsScreen(
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // 3. GENERAL PREFERENCES SECTION
+        // 3. APP PREFERENCES
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(18.dp),
@@ -358,13 +388,14 @@ fun SettingsScreen(
         ) {
             Column(modifier = Modifier.padding(18.dp)) {
                 Text(
-                    text = "APPLICATION PREFERENCES",
+                    text = "PREFERENCES & ALERTS",
                     style = MaterialTheme.typography.labelSmall,
                     color = Color(0xFF71717A),
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 1.sp
                 )
-                Spacer(modifier = Modifier.height(14.dp))
+
+                Spacer(modifier = Modifier.height(12.dp))
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -372,8 +403,8 @@ fun SettingsScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column {
-                        Text("Dark AMOLED Theme", color = Color.White, fontWeight = FontWeight.Medium)
-                        Text("True black OLED optimized", color = Color(0xFF71717A), fontSize = 12.sp)
+                        Text("Dark Theme (Sophisticated Dark)", color = Color.White, fontWeight = FontWeight.Medium)
+                        Text("High contrast AMOLED dark styling", color = Color(0xFF71717A), fontSize = 12.sp)
                     }
                     Switch(
                         checked = p.useDarkTheme,
@@ -410,7 +441,7 @@ fun SettingsScreen(
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // 4. APP UPDATES SECTION (Polished & Styled)
+        // 4. GITHUB RELEASES & APP UPDATE CHECKER (Connected to https://github.com/PASSK3YS/Chomp-Clock/releases)
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(18.dp),
@@ -424,7 +455,7 @@ fun SettingsScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "APP UPDATES & RELEASES",
+                        text = "GITHUB RELEASES & UPDATES",
                         style = MaterialTheme.typography.labelSmall,
                         color = Color(0xFF71717A),
                         fontWeight = FontWeight.Bold,
@@ -432,14 +463,14 @@ fun SettingsScreen(
                     )
                     Surface(
                         shape = RoundedCornerShape(50),
-                        color = Color(0xFF064E3B),
-                        border = BorderStroke(1.dp, Color(0xFF059669))
+                        color = Color(0xFF1E293B),
+                        border = BorderStroke(1.dp, Color(0xFF334155))
                     ) {
                         Text(
-                            text = "v1.1.0 • Up to date",
-                            color = Color(0xFF34D399),
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
+                            text = "PASSK3YS/Chomp-Clock",
+                            color = Color(0xFF94A3B8),
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.SemiBold,
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                         )
                     }
@@ -447,32 +478,20 @@ fun SettingsScreen(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text("Chomp Clock Pro Edition", color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-                        Text("Latest build installed and verified", color = Color(0xFFA1A1AA), fontSize = 12.sp)
-                    }
-                }
+                Text(
+                    text = "Checks directly against GitHub repository releases for new versions and APK downloads.",
+                    color = Color(0xFFA1A1AA),
+                    fontSize = 12.sp
+                )
 
                 Spacer(modifier = Modifier.height(14.dp))
 
+                // Check Button
                 Button(
-                    onClick = {
-                        scope.launch {
-                            isCheckingUpdates = true
-                            updateCheckResult = null
-                            delay(1200)
-                            isCheckingUpdates = false
-                            updateCheckResult = "You are on the latest version of Chomp Clock (v1.1.0)."
-                        }
-                    },
+                    onClick = { viewModel.checkForUpdates() },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(44.dp),
+                        .height(46.dp),
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = Color(0xFF27272A),
@@ -480,52 +499,234 @@ fun SettingsScreen(
                     ),
                     border = BorderStroke(1.dp, Color(0xFF3F3F46))
                 ) {
-                    if (isCheckingUpdates) {
+                    if (updateCheckState is UpdateCheckState.Checking) {
                         CircularProgressIndicator(
                             modifier = Modifier.size(18.dp),
                             color = Color(0xFF60A5FA),
                             strokeWidth = 2.dp
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Checking for updates...", fontSize = 13.sp)
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text("Checking GitHub releases...", fontSize = 13.sp)
                     } else {
-                        Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp), tint = Color(0xFF60A5FA))
+                        Icon(Icons.Default.CloudDownload, contentDescription = null, modifier = Modifier.size(18.dp), tint = Color(0xFF60A5FA))
                         Spacer(modifier = Modifier.width(8.dp))
                         Text("Check for Updates", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                     }
                 }
 
-                if (updateCheckResult != null) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = updateCheckResult!!,
-                        color = Color(0xFF34D399),
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium
-                    )
+                // Status Results
+                when (val state = updateCheckState) {
+                    is UpdateCheckState.UpdateAvailable -> {
+                        Spacer(modifier = Modifier.height(14.dp))
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = Color(0xFF0F291E),
+                            border = BorderStroke(1.dp, Color(0xFF059669)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(14.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "NEW UPDATE AVAILABLE 🎉",
+                                        color = Color(0xFF34D399),
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 13.sp
+                                    )
+                                    Surface(
+                                        shape = RoundedCornerShape(6.dp),
+                                        color = Color(0xFF059669)
+                                    ) {
+                                        Text(
+                                            text = state.latestVersion,
+                                            color = Color.White,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 11.sp,
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                        )
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Text(
+                                    text = state.releaseName,
+                                    color = Color.White,
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 14.sp
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = state.releaseNotes.take(200) + if (state.releaseNotes.length > 200) "..." else "",
+                                    color = Color(0xFFA1A1AA),
+                                    fontSize = 12.sp
+                                )
+
+                                Spacer(modifier = Modifier.height(12.dp))
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Button(
+                                        onClick = {
+                                            val url = state.downloadUrl ?: state.htmlUrl
+                                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                                            context.startActivity(intent)
+                                        },
+                                        modifier = Modifier.weight(1f),
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF059669)),
+                                        shape = RoundedCornerShape(8.dp)
+                                    ) {
+                                        Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(16.dp))
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("Download APK", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                    }
+
+                                    OutlinedButton(
+                                        onClick = {
+                                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(state.htmlUrl))
+                                            context.startActivity(intent)
+                                        },
+                                        modifier = Modifier.weight(1f),
+                                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+                                        border = BorderStroke(1.dp, Color(0xFF059669)),
+                                        shape = RoundedCornerShape(8.dp)
+                                    ) {
+                                        Text("View Release", fontSize = 12.sp)
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    is UpdateCheckState.UpToDate -> {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = Color(0xFF064E3B).copy(alpha = 0.4f),
+                            border = BorderStroke(1.dp, Color(0xFF059669).copy(alpha = 0.5f)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color(0xFF34D399), modifier = Modifier.size(20.dp))
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Column {
+                                    Text(
+                                        text = "You're on the latest version (${state.currentVersion})",
+                                        color = Color(0xFF34D399),
+                                        fontWeight = FontWeight.SemiBold,
+                                        fontSize = 13.sp
+                                    )
+                                    Text(
+                                        text = "Latest verified GitHub release: ${state.releaseName}",
+                                        color = Color(0xFFA1A1AA),
+                                        fontSize = 11.sp
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    is UpdateCheckState.NoReleasesFound -> {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = Color(0xFF1E293B),
+                            border = BorderStroke(1.dp, Color(0xFF334155)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Text(
+                                    text = "Connected to PASSK3YS/Chomp-Clock",
+                                    color = Color(0xFF60A5FA),
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 13.sp
+                                )
+                                Text(
+                                    text = "No releases published yet on GitHub. When you tag a release (e.g. v1.1.0), GitHub Actions will automatically generate the .APK file.",
+                                    color = Color(0xFFA1A1AA),
+                                    fontSize = 11.sp
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = "Open Releases Page →",
+                                    color = Color(0xFF60A5FA),
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    modifier = Modifier.clickable {
+                                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(state.repoUrl))
+                                        context.startActivity(intent)
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                    is UpdateCheckState.Error -> {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = Color(0xFF27272A),
+                            border = BorderStroke(1.dp, Color(0xFF3F3F46)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Text(
+                                    text = "Unable to check GitHub Releases: ${state.errorMessage}",
+                                    color = Color(0xFFFCA5A5),
+                                    fontSize = 12.sp
+                                )
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Text(
+                                    text = "Visit GitHub Releases Manually →",
+                                    color = Color(0xFF60A5FA),
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    modifier = Modifier.clickable {
+                                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(state.repoUrl))
+                                        context.startActivity(intent)
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                    UpdateCheckState.Checking -> {
+                        // Progress indicator shown in button
+                    }
+
+                    UpdateCheckState.Idle -> {
+                        // Idle state
+                    }
                 }
 
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
-                // Release notes dropdown
+                // Release notes collapsible
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable { showReleaseNotes = !showReleaseNotes }
+                        .clickable { showWhatsNewDialog = !showWhatsNewDialog }
                         .padding(vertical = 4.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("What's new in v1.1.0", color = Color(0xFF60A5FA), fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                    Text("What's new in this build", color = Color(0xFF60A5FA), fontSize = 12.sp, fontWeight = FontWeight.Medium)
                     Icon(
-                        imageVector = if (showReleaseNotes) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                        imageVector = if (showWhatsNewDialog) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
                         contentDescription = null,
                         tint = Color(0xFF60A5FA),
                         modifier = Modifier.size(18.dp)
                     )
                 }
 
-                AnimatedVisibility(visible = showReleaseNotes) {
+                AnimatedVisibility(visible = showWhatsNewDialog) {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -533,12 +734,12 @@ fun SettingsScreen(
                             .background(Color(0xFF27272A).copy(alpha = 0.5f), RoundedCornerShape(10.dp))
                             .padding(12.dp)
                     ) {
-                        Text("• Added Stone & Pounds (st & lbs) metric options in settings", color = Color(0xFFA1A1AA), fontSize = 12.sp)
-                        Text("• Custom fasting duration picker with minutes & hours", color = Color(0xFFA1A1AA), fontSize = 12.sp)
-                        Text("• Persistent Breakfast, Lunch, Dinner, Snacks & Drinks logs", color = Color(0xFFA1A1AA), fontSize = 12.sp)
-                        Text("• Advanced Analytics dashboard with multi-timeframe charts", color = Color(0xFFA1A1AA), fontSize = 12.sp)
-                        Text("• Profile Avatar icon chooser and custom gallery photo uploader", color = Color(0xFFA1A1AA), fontSize = 12.sp)
-                        Text("• Protected Danger Zone data erase confirmation", color = Color(0xFFA1A1AA), fontSize = 12.sp)
+                        Text("• UK Supermarket Food Database (Tesco, Sainsbury's, ASDA, M&S, Morrisons, Aldi, Lidl)", color = Color(0xFFA1A1AA), fontSize = 12.sp)
+                        Text("• UK Barcode scanning with instant product nutrition autofill", color = Color(0xFFA1A1AA), fontSize = 12.sp)
+                        Text("• GitHub Releases Integration with automated APK build workflow", color = Color(0xFFA1A1AA), fontSize = 12.sp)
+                        Text("• Stone & Pounds (st & lbs), Pounds, and KG unit switcher", color = Color(0xFFA1A1AA), fontSize = 12.sp)
+                        Text("• Custom fasting range menu with hour and minute pickers", color = Color(0xFFA1A1AA), fontSize = 12.sp)
+                        Text("• Persistent 5-category daily meal board (Breakfast, Lunch, Dinner, Snacks, Drinks)", color = Color(0xFFA1A1AA), fontSize = 12.sp)
                     }
                 }
             }
@@ -585,10 +786,11 @@ fun SettingsScreen(
 
         Spacer(modifier = Modifier.height(28.dp))
         Text(
-            text = "Chomp Clock v1.1.0 • Built with Jetpack Compose",
+            text = "Chomp Clock • GitHub PASSK3YS/Chomp-Clock",
             modifier = Modifier.align(Alignment.CenterHorizontally),
             style = MaterialTheme.typography.bodySmall,
-            color = Color(0xFF71717A)
+            color = Color(0xFF71717A),
+            textAlign = TextAlign.Center
         )
         Spacer(modifier = Modifier.height(16.dp))
     }

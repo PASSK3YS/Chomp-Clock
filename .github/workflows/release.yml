@@ -1,0 +1,68 @@
+name: Build and Release Android APK
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version_name:
+        description: 'Release Version Name (e.g. v1.1.0)'
+        required: false
+        default: 'v1.1.0'
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
+
+      - name: Grant Execute Permission for Gradle
+        run: chmod +x gradlew || true
+
+      - name: Build APK (Release & Debug)
+        run: |
+          if [ -f "./gradlew" ]; then
+            ./gradlew assembleDebug --stacktrace
+          else
+            gradle assembleDebug --stacktrace
+          fi
+
+      - name: Prepare APK Asset
+        run: |
+          mkdir -p build_output
+          # Find generated debug/release APK
+          APK_FILE=$(find app/build/outputs/apk -name "*.apk" | head -n 1)
+          if [ -n "$APK_FILE" ]; then
+            cp "$APK_FILE" build_output/ChompClock-latest.apk
+            echo "Found APK at $APK_FILE, copied to build_output/ChompClock-latest.apk"
+          else
+            echo "No APK found in app/build/outputs/apk"
+            exit 1
+          fi
+
+      - name: Create GitHub Release and Upload APK
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+        with:
+          name: Release ${{ github.ref_name || github.event.inputs.version_name }}
+          tag_name: ${{ github.ref_name || github.event.inputs.version_name }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          files: |
+            build_output/ChompClock-latest.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

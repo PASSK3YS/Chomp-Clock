@@ -1,7 +1,10 @@
 package com.example
 
+import com.example.data.local.UkFoodCatalog
+import com.example.data.repository.UkFoodRepository
 import com.example.data.repository.WeightUnit
 import com.example.util.WeightUtils
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -40,5 +43,35 @@ class ExampleUnitTest {
         val kg = WeightUtils.parseToKg("154", "", WeightUnit.LBS)
         assertNotNull(kg)
         assertEquals(70f, kg!!, 0.5f)
+    }
+
+    @Test
+    fun testUkFoodCatalogHasSupermarkets() {
+        assertTrue(UkFoodCatalog.items.isNotEmpty())
+        val supermarkets = UkFoodCatalog.items.map { it.supermarketOrBrand }.toSet()
+        assertTrue(supermarkets.contains("Tesco"))
+        assertTrue(supermarkets.contains("Sainsbury's"))
+        assertTrue(supermarkets.contains("ASDA"))
+        assertTrue(supermarkets.contains("M&S"))
+        assertTrue(supermarkets.contains("Heinz"))
+        assertTrue(supermarkets.contains("Warburtons"))
+    }
+
+    @Test
+    fun testUkFoodLocalSearch() = runBlocking {
+        val repo = UkFoodRepository()
+        val tescoResults = repo.searchFood("chicken", "Tesco")
+        assertTrue(tescoResults.isNotEmpty())
+        assertTrue(tescoResults.all { it.brandOrSupermarket.equals("Tesco", ignoreCase = true) })
+    }
+
+    @Test
+    fun testUkFoodBarcodeLookupLocal() = runBlocking {
+        val repo = UkFoodRepository()
+        // Heinz beans barcode: 5000157024671
+        val result = repo.lookupBarcode("5000157024671")
+        assertNotNull(result)
+        assertEquals("Heinz", result?.brandOrSupermarket)
+        assertTrue(result?.name?.contains("Heinz") == true)
     }
 }
