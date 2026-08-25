@@ -98,11 +98,15 @@ fun FoodScreen(
         else -> "Good evening"
     }
 
+    var isBarcodeLookingUp by remember { mutableStateOf(false) }
+
     if (showScanner) {
         BarcodeScannerScreen(
             onBarcodeScanned = { barcode ->
                 showScanner = false
+                isBarcodeLookingUp = true
                 viewModel.scanBarcodeAndLookup(barcode) { result ->
+                    isBarcodeLookingUp = false
                     if (result != null) {
                         scannedProductToConfirm = result
                     } else {
@@ -113,6 +117,42 @@ fun FoodScreen(
             onClose = { showScanner = false }
         )
         return
+    }
+
+    if (isBarcodeLookingUp) {
+        Dialog(onDismissRequest = { isBarcodeLookingUp = false }) {
+            Surface(
+                shape = RoundedCornerShape(20.dp),
+                color = Color(0xFF18181B),
+                border = BorderStroke(1.dp, Color(0xFF27272A)),
+                modifier = Modifier.padding(16.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(28.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    CircularProgressIndicator(
+                        color = Color(0xFF3B82F6),
+                        strokeWidth = 3.dp,
+                        modifier = Modifier.size(44.dp)
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = "Looking up UK Barcode...",
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        fontSize = 15.sp
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = "Searching Open Food Facts & UK Supermarket database",
+                        color = Color(0xFFA1A1AA),
+                        fontSize = 12.sp,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
+        }
     }
 
     if (showAvatarPicker) {
@@ -148,13 +188,13 @@ fun FoodScreen(
             product = FoodSearchResult(
                 id = code,
                 name = "",
-                brandOrSupermarket = "UK Product",
+                brandOrSupermarket = "Unlisted UK Item",
                 category = "Scanned Food",
                 caloriesPerServing = 150,
-                servingSize = "1 serving",
+                servingSize = "1 serving (100g)",
                 caloriesPer100g = 150,
                 barcode = code,
-                isUkSupermarket = true
+                isUkSupermarket = false
             ),
             initialMealType = selectedMealForScan,
             onDismiss = {
@@ -1117,13 +1157,14 @@ fun LogScannedProductDialog(
     onDismiss: () -> Unit,
     onConfirm: (name: String, serving: String, calories: Int, mealType: String, barcode: String?) -> Unit
 ) {
-    var editableName by remember { mutableStateOf(product.name.ifBlank { "UK Barcode #${product.barcode}" }) }
+    var editableName by remember { mutableStateOf(product.name) }
     var editableServing by remember { mutableStateOf(product.servingSize) }
     var editableCalories by remember { mutableStateOf(product.caloriesPerServing.toString()) }
     var selectedMeal by remember { mutableStateOf(initialMealType) }
     var multiplier by remember { mutableStateOf(1.0f) }
 
     val brandColor = getSupermarketBrandColor(product.brandOrSupermarket)
+    val isFound = product.name.isNotBlank()
 
     Dialog(onDismissRequest = onDismiss) {
         Surface(
@@ -1142,15 +1183,15 @@ fun LogScannedProductDialog(
                         Icon(
                             Icons.Default.QrCodeScanner,
                             contentDescription = null,
-                            tint = Color(0xFF34D399),
+                            tint = if (isFound) Color(0xFF34D399) else Color(0xFF60A5FA),
                             modifier = Modifier.size(20.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            "SCANNED PRODUCT AUTOFILL",
+                            text = if (isFound) "PRODUCT IDENTIFIED" else "NEW SCANNED PRODUCT",
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.Bold,
-                            color = Color(0xFF34D399),
+                            color = if (isFound) Color(0xFF34D399) else Color(0xFF60A5FA),
                             letterSpacing = 1.sp
                         )
                     }
@@ -1161,7 +1202,25 @@ fun LogScannedProductDialog(
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                // Brand Pill
+                // Status Banner
+                if (!isFound) {
+                    Surface(
+                        color = Color(0xFF3B82F6).copy(alpha = 0.15f),
+                        shape = RoundedCornerShape(8.dp),
+                        border = BorderStroke(1.dp, Color(0xFF3B82F6).copy(alpha = 0.4f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = "Barcode scanned! Enter product name and calories below to log.",
+                            color = Color(0xFF93C5FD),
+                            fontSize = 12.sp,
+                            modifier = Modifier.padding(8.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(10.dp))
+                }
+
+                // Brand Pill & Barcode
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Surface(
                         shape = RoundedCornerShape(4.dp),
@@ -1192,6 +1251,7 @@ fun LogScannedProductDialog(
                     value = editableName,
                     onValueChange = { editableName = it },
                     label = { Text("Product Name") },
+                    placeholder = { Text("e.g. Walkers Ready Salted, Tesco Meal Deal", color = Color(0xFF71717A)) },
                     modifier = Modifier.fillMaxWidth(),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = Color(0xFF3B82F6),

@@ -1,5 +1,10 @@
 package com.example.ui.fasting
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -19,11 +24,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.data.local.entity.FastSession
 import com.example.data.repository.UserPreferences
@@ -40,6 +47,7 @@ fun FastingScreen(
     viewModel: FastingViewModel = viewModel(),
     settingsViewModel: SettingsViewModel = viewModel()
 ) {
+    val context = LocalContext.current
     val isFasting by viewModel.isFasting.collectAsState()
     val elapsed by viewModel.elapsedMillis.collectAsState()
     val targetDuration by viewModel.targetDurationMillis.collectAsState()
@@ -53,7 +61,21 @@ fun FastingScreen(
     var showCustomFastDialog by remember { mutableStateOf(false) }
     var showAvatarPicker by remember { mutableStateOf(false) }
     var showMetabolicStatesDialog by remember { mutableStateOf(false) }
+    var showEndFastConfirmDialog by remember { mutableStateOf(false) }
     var fastToDelete by remember { mutableStateOf<FastSession?>(null) }
+
+    // Request notification permission for persistent silent fasting notification
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { }
+
+    LaunchedEffect(Unit) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
+    }
 
     val username = userPrefs?.username ?: "User"
     val avatarId = userPrefs?.avatarId
@@ -63,6 +85,78 @@ fun FastingScreen(
         in 0..11 -> "Good morning"
         in 12..16 -> "Good afternoon"
         else -> "Good evening"
+    }
+
+    if (showEndFastConfirmDialog) {
+        val totalSeconds = elapsed / 1000
+        val targetSeconds = maxOf(1L, targetDuration / 1000)
+        val isOvertime = totalSeconds >= targetSeconds
+        val elapsedH = totalSeconds / 3600
+        val elapsedM = (totalSeconds % 3600) / 60
+        val targetH = String.format(Locale.getDefault(), "%.1f", targetDuration / (3600f * 1000f)).removeSuffix(".0")
+
+        AlertDialog(
+            onDismissRequest = { showEndFastConfirmDialog = false },
+            title = {
+                Text(
+                    text = if (isOvertime) "Complete Fast?" else "End Fast Early?",
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Column {
+                    if (isOvertime) {
+                        Text(
+                            text = "🎉 Awesome effort! You reached your $targetH-hour goal and completed ${elapsedH}h ${elapsedM}m total fasting time.",
+                            color = Color(0xFF34D399),
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    } else {
+                        val remainingSec = targetSeconds - totalSeconds
+                        val remH = remainingSec / 3600
+                        val remM = (remainingSec % 3600) / 60
+                        Text(
+                            text = "You have fasted for ${elapsedH}h ${elapsedM}m out of your $targetH-hour goal (${remH}h ${remM}m remaining).",
+                            color = Color(0xFFA1A1AA),
+                            fontSize = 14.sp
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Are you sure you want to end this fasting session and record it in your history?",
+                        color = Color(0xFFD4D4D8),
+                        fontSize = 13.sp
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showEndFastConfirmDialog = false
+                        viewModel.endFast()
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isOvertime) Color(0xFF10B981) else Color(0xFFDC2626)
+                    ),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Text(
+                        text = if (isOvertime) "End & Save Fast" else "End Fast Now",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showEndFastConfirmDialog = false }) {
+                    Text("Keep Fasting", color = Color(0xFF60A5FA), fontWeight = FontWeight.SemiBold)
+                }
+            },
+            containerColor = Color(0xFF18181B),
+            shape = RoundedCornerShape(18.dp)
+        )
     }
 
     if (showMetabolicStatesDialog) {
@@ -332,7 +426,7 @@ fun FastingScreen(
             Spacer(modifier = Modifier.weight(1f))
 
             Button(
-                onClick = { viewModel.endFast() },
+                onClick = { showEndFastConfirmDialog = true },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(52.dp),

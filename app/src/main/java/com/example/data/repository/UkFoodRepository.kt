@@ -163,70 +163,152 @@ class UkFoodRepository(
         if (trimmedCode.startsWith("0") && trimmedCode.length == 13) codesToTry.add(trimmedCode.drop(1))
 
         for (code in codesToTry) {
+            // First attempt: Typed v0
             try {
-                val response = api.getProduct(code)
+                val response = api.getProductV0(code)
                 val prod = response.product
                 if (prod != null) {
-                    val brand = prod.brands?.split(",")?.firstOrNull()?.trim()
-                        ?: prod.brandsTags?.firstOrNull()?.replace("-", " ")?.replaceFirstChar { it.uppercase() }
-                        ?: "UK Food"
-
-                    val rawName = listOfNotNull(
-                        prod.productName?.takeIf { it.isNotBlank() },
-                        prod.productNameEn?.takeIf { it.isNotBlank() },
-                        prod.genericName?.takeIf { it.isNotBlank() },
-                        prod.genericNameEn?.takeIf { it.isNotBlank() },
-                        prod.abbreviatedProductName?.takeIf { it.isNotBlank() }
-                    ).firstOrNull() ?: "Food Item (#$code)"
-
-                    val formattedName = formatProductName(brand, rawName)
-
-                    val cal100g = extractCalories100g(prod.nutriments)
-                    val servingText = prod.servingSize?.trim()?.takeIf { it.isNotBlank() } ?: "1 serving (100g)"
-                    val calServing = extractCaloriesServing(prod.nutriments, servingText, prod.servingQuantity, cal100g)
-
-                    val gramsInServing = prod.servingQuantity
-                        ?: Regex("""(\d+(?:\.\d+)?)\s*(?:g|ml|grams|millilitres|g\b|ml\b)""", RegexOption.IGNORE_CASE)
-                            .find(servingText)?.groupValues?.get(1)?.toDoubleOrNull()
-
-                    val prot = (prod.nutriments?.proteinsServing
-                        ?: (if (gramsInServing != null) (prod.nutriments?.proteins100g ?: 0.0) * gramsInServing / 100.0 else prod.nutriments?.proteins100g)
-                        ?: 0.0).toFloat()
-
-                    val carbs = (prod.nutriments?.carbohydratesServing
-                        ?: (if (gramsInServing != null) (prod.nutriments?.carbohydrates100g ?: 0.0) * gramsInServing / 100.0 else prod.nutriments?.carbohydrates100g)
-                        ?: 0.0).toFloat()
-
-                    val fat = (prod.nutriments?.fatServing
-                        ?: (if (gramsInServing != null) (prod.nutriments?.fat100g ?: 0.0) * gramsInServing / 100.0 else prod.nutriments?.fat100g)
-                        ?: 0.0).toFloat()
-
-                    val category = prod.genericName?.takeIf { it.isNotBlank() }
-                        ?: prod.categories?.split(",")?.firstOrNull()?.trim()
-                        ?: "Scanned Product"
-
-                    return@withContext FoodSearchResult(
-                        id = prod.code ?: code,
-                        name = formattedName,
-                        brandOrSupermarket = brand,
-                        category = category,
-                        caloriesPerServing = maxOf(0, calServing),
-                        servingSize = servingText,
-                        caloriesPer100g = maxOf(0, cal100g),
-                        proteinGrams = maxOf(0f, prot),
-                        carbsGrams = maxOf(0f, carbs),
-                        fatGrams = maxOf(0f, fat),
-                        barcode = code,
-                        isUkSupermarket = isUkSupermarketBrand(brand),
-                        imageUrl = prod.imageThumbUrl ?: prod.imageFrontUrl ?: prod.imageUrl
-                    )
+                    val result = mapProductToResult(code, prod)
+                    if (result != null) return@withContext result
                 }
             } catch (e: Exception) {
-                // Continue to next code variation
+                // Ignore and try raw parsing
+            }
+
+            // Second attempt: Raw JSON via v0 endpoint parsed with JSONObject (handles any typing quirks)
+            try {
+                val rawBody = api.getProductRaw(code).string()
+                val json = org.json.JSONObject(rawBody)
+                val status = json.optInt("status", -1)
+                if (status == 1 && json.has("product")) {
+                    val pJson = json.getJSONObject("product")
+                    val rawName = listOfNotNull(
+                        pJson.optString("product_name").takeIf { it.isNotBlank() },
+                        pJson.optString("product_name_en").takeIf { it.isNotBlank() },
+                        pJson.optString("generic_name").takeIf { it.isNotBlank() },
+                        pJson.optString("generic_name_en").takeIf { it.isNotBlank() },
+                        pJson.optString("abbreviated_product_name").takeIf { it.isNotBlank() }
+                    ).firstOrNull()
+
+                    if (rawName != null) {
+                        val brand = pJson.optString("brands").split(",").firstOrNull()?.trim()
+                            ?.takeIf { it.isNotBlank() } ?: "UK Food"
+                        val formattedName = formatProductName(brand, rawName)
+
+                        val nutrimentsJson = pJson.optJSONObject("nutriments")
+                        var cal100g = 150
+                        var calServing: Int? = null
+
+                        if (nutrimentsJson != null) {
+                            val directKcal100 = nutrimentsJson.optDouble("energy-kcal_100g", Double.NaN)
+                            val altKcal100 = nutrimentsJson.optDouble("energy-kcal", Double.NaN)
+                            val kj100 = nutrimentsJson.optDouble("energy_100g", Double.NaN)
+
+                            cal100g = when {
+                                !directKcal100.isNaN() && directKcal100 > 0 -> directKcal100.toInt()
+                                !altKcal100.isNaN() && altKcal100 > 0 -> altKcal100.toInt()
+                                !kj100.isNaN() && kj100 > 0 -> (kj100 / 4.184).toInt()
+                                else -> 150
+                            }
+
+                            val directKcalServ = nutrimentsJson.optDouble("energy-kcal_serving", Double.NaN)
+                            val kjServ = nutrimentsJson.optDouble("energy_serving", Double.NaN)
+                            if (!directKcalServ.isNaN() && directKcalServ > 0) {
+                                calServing = directKcalServ.toInt()
+                            } else if (!kjServ.isNaN() && kjServ > 0) {
+                                calServing = (kjServ / 4.184).toInt()
+                            }
+                        }
+
+                        val servingText = pJson.optString("serving_size").trim().takeIf { it.isNotBlank() } ?: "1 serving (100g)"
+                        val finalServingCal = calServing ?: extractCaloriesServing(null, servingText, pJson.optDouble("serving_quantity", Double.NaN).takeIf { !it.isNaN() }, cal100g)
+
+                        val prot = nutrimentsJson?.optDouble("proteins_100g", 0.0)?.toFloat() ?: 0f
+                        val carbs = nutrimentsJson?.optDouble("carbohydrates_100g", 0.0)?.toFloat() ?: 0f
+                        val fat = nutrimentsJson?.optDouble("fat_100g", 0.0)?.toFloat() ?: 0f
+                        val category = pJson.optString("categories").split(",").firstOrNull()?.trim()?.takeIf { it.isNotBlank() } ?: "Scanned Product"
+                        val img = pJson.optString("image_front_thumb_url").takeIf { it.isNotBlank() }
+                            ?: pJson.optString("image_url").takeIf { it.isNotBlank() }
+
+                        return@withContext FoodSearchResult(
+                            id = code,
+                            name = formattedName,
+                            brandOrSupermarket = brand,
+                            category = category,
+                            caloriesPerServing = maxOf(0, finalServingCal),
+                            servingSize = servingText,
+                            caloriesPer100g = maxOf(0, cal100g),
+                            proteinGrams = maxOf(0f, prot),
+                            carbsGrams = maxOf(0f, carbs),
+                            fatGrams = maxOf(0f, fat),
+                            barcode = code,
+                            isUkSupermarket = isUkSupermarketBrand(brand),
+                            imageUrl = img
+                        )
+                    }
+                }
+            } catch (e: Exception) {
+                // Continue
             }
         }
 
         null
+    }
+
+    private fun mapProductToResult(code: String, prod: com.example.data.remote.Product): FoodSearchResult? {
+        val brand = prod.brands?.split(",")?.firstOrNull()?.trim()
+            ?: prod.brandsTags?.firstOrNull()?.replace("-", " ")?.replaceFirstChar { it.uppercase() }
+            ?: "UK Food"
+
+        val rawName = listOfNotNull(
+            prod.productName?.takeIf { it.isNotBlank() },
+            prod.productNameEn?.takeIf { it.isNotBlank() },
+            prod.genericName?.takeIf { it.isNotBlank() },
+            prod.genericNameEn?.takeIf { it.isNotBlank() },
+            prod.abbreviatedProductName?.takeIf { it.isNotBlank() }
+        ).firstOrNull() ?: return null
+
+        val formattedName = formatProductName(brand, rawName)
+
+        val cal100g = extractCalories100g(prod.nutriments)
+        val servingText = prod.servingSize?.trim()?.takeIf { it.isNotBlank() } ?: "1 serving (100g)"
+        val calServing = extractCaloriesServing(prod.nutriments, servingText, prod.servingQuantity, cal100g)
+
+        val gramsInServing = prod.servingQuantity
+            ?: Regex("""(\d+(?:\.\d+)?)\s*(?:g|ml|grams|millilitres|g\b|ml\b)""", RegexOption.IGNORE_CASE)
+                .find(servingText)?.groupValues?.get(1)?.toDoubleOrNull()
+
+        val prot = (prod.nutriments?.proteinsServing
+            ?: (if (gramsInServing != null) (prod.nutriments?.proteins100g ?: 0.0) * gramsInServing / 100.0 else prod.nutriments?.proteins100g)
+            ?: 0.0).toFloat()
+
+        val carbs = (prod.nutriments?.carbohydratesServing
+            ?: (if (gramsInServing != null) (prod.nutriments?.carbohydrates100g ?: 0.0) * gramsInServing / 100.0 else prod.nutriments?.carbohydrates100g)
+            ?: 0.0).toFloat()
+
+        val fat = (prod.nutriments?.fatServing
+            ?: (if (gramsInServing != null) (prod.nutriments?.fat100g ?: 0.0) * gramsInServing / 100.0 else prod.nutriments?.fat100g)
+            ?: 0.0).toFloat()
+
+        val category = prod.genericName?.takeIf { it.isNotBlank() }
+            ?: prod.categories?.split(",")?.firstOrNull()?.trim()
+            ?: "Scanned Product"
+
+        return FoodSearchResult(
+            id = prod.code ?: code,
+            name = formattedName,
+            brandOrSupermarket = brand,
+            category = category,
+            caloriesPerServing = maxOf(0, calServing),
+            servingSize = servingText,
+            caloriesPer100g = maxOf(0, cal100g),
+            proteinGrams = maxOf(0f, prot),
+            carbsGrams = maxOf(0f, carbs),
+            fatGrams = maxOf(0f, fat),
+            barcode = code,
+            isUkSupermarket = isUkSupermarketBrand(brand),
+            imageUrl = prod.imageThumbUrl ?: prod.imageFrontUrl ?: prod.imageUrl
+        )
     }
 
     private fun extractCalories100g(nutriments: com.example.data.remote.Nutriments?): Int {

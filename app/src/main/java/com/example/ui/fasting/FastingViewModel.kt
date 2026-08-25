@@ -17,6 +17,7 @@ import kotlinx.coroutines.launch
 class FastingViewModel(application: Application) : AndroidViewModel(application) {
     private val db = AppDatabase.getDatabase(application)
     private val dao = db.fastSessionDao()
+    private val prefs = application.getSharedPreferences("fasting_prefs", Context.MODE_PRIVATE)
 
     private val _isFasting = MutableStateFlow(false)
     val isFasting = _isFasting.asStateFlow()
@@ -55,6 +56,20 @@ class FastingViewModel(application: Application) : AndroidViewModel(application)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     init {
+        // Restore active fast if saved
+        val savedIsFasting = prefs.getBoolean(KEY_IS_FASTING, false)
+        if (savedIsFasting) {
+            val savedStart = prefs.getLong(KEY_START_TIME, 0L)
+            val savedTarget = prefs.getLong(KEY_TARGET_DURATION, 16L * 3600 * 1000)
+            if (savedStart > 0L) {
+                _startTime.value = savedStart
+                _targetDurationMillis.value = savedTarget
+                _elapsedMillis.value = System.currentTimeMillis() - savedStart
+                _isFasting.value = true
+                ensureServiceRunning(savedStart, savedTarget)
+            }
+        }
+
         viewModelScope.launch {
             while (true) {
                 if (_isFasting.value) {
@@ -65,6 +80,20 @@ class FastingViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    private fun ensureServiceRunning(start: Long, target: Long) {
+        val context = getApplication<Application>()
+        try {
+            val intent = Intent(context, FastingService::class.java).apply {
+                action = FastingService.ACTION_START_FAST
+                putExtra(FastingService.EXTRA_START_TIME, start)
+                putExtra(FastingService.EXTRA_TARGET_TIME, target)
+            }
+            context.startForegroundService(intent)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
     fun startFast(durationMillis: Long) {
         val now = System.currentTimeMillis()
         _startTime.value = now
@@ -72,17 +101,13 @@ class FastingViewModel(application: Application) : AndroidViewModel(application)
         _elapsedMillis.value = 0L
         _isFasting.value = true
 
-        val context = getApplication<Application>()
-        try {
-            val intent = Intent(context, FastingService::class.java).apply {
-                action = FastingService.ACTION_START_FAST
-                putExtra(FastingService.EXTRA_START_TIME, now)
-                putExtra(FastingService.EXTRA_TARGET_TIME, durationMillis)
-            }
-            context.startForegroundService(intent)
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
+        prefs.edit()
+            .putBoolean(KEY_IS_FASTING, true)
+            .putLong(KEY_START_TIME, now)
+            .putLong(KEY_TARGET_DURATION, durationMillis)
+            .apply()
+
+        ensureServiceRunning(now, durationMillis)
     }
 
     fun endFast() {
@@ -91,6 +116,8 @@ class FastingViewModel(application: Application) : AndroidViewModel(application)
         val start = _startTime.value
         val target = _targetDurationMillis.value
         _isFasting.value = false
+
+        prefs.edit().clear().apply()
         
         viewModelScope.launch {
             dao.insertSession(
@@ -129,5 +156,11 @@ class FastingViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch {
             dao.deleteSession(session)
         }
+    }
+
+    companion object {
+        private const val KEY_IS_FASTING = "is_fasting"
+        private const val KEY_START_TIME = "start_time"
+        private const val KEY_TARGET_DURATION = "target_duration"
     }
 }

@@ -1,19 +1,30 @@
 package com.example.data.remote
 
 import com.squareup.moshi.Json
+import okhttp3.OkHttpClient
+import okhttp3.ResponseBody
 import retrofit2.Retrofit
 import retrofit2.converter.moshi.MoshiConverterFactory
 import retrofit2.http.GET
 import retrofit2.http.Headers
 import retrofit2.http.Path
 import retrofit2.http.Query
+import java.util.concurrent.TimeUnit
 
 interface OpenFoodFactsApi {
-    @Headers("User-Agent: ChompClock - Android - Version 1.0")
+    @Headers("User-Agent: ChompClock-Android - Version 1.1.3 (https://github.com/PASSK3YS/Chomp-Clock)")
+    @GET("api/v0/product/{barcode}.json")
+    suspend fun getProductV0(@Path("barcode") barcode: String): ProductResponse
+
+    @Headers("User-Agent: ChompClock-Android - Version 1.1.3 (https://github.com/PASSK3YS/Chomp-Clock)")
     @GET("api/v2/product/{barcode}.json")
     suspend fun getProduct(@Path("barcode") barcode: String): ProductResponse
 
-    @Headers("User-Agent: ChompClock - Android - Version 1.0")
+    @Headers("User-Agent: ChompClock-Android - Version 1.1.3 (https://github.com/PASSK3YS/Chomp-Clock)")
+    @GET("api/v0/product/{barcode}.json")
+    suspend fun getProductRaw(@Path("barcode") barcode: String): ResponseBody
+
+    @Headers("User-Agent: ChompClock-Android - Version 1.1.3 (https://github.com/PASSK3YS/Chomp-Clock)")
     @GET("cgi/search.pl")
     suspend fun searchProducts(
         @Query("search_terms") searchTerms: String,
@@ -29,9 +40,16 @@ interface OpenFoodFactsApi {
         private const val BASE_URL = "https://world.openfoodfacts.org/"
 
         fun create(): OpenFoodFactsApi {
+            val okHttpClient = OkHttpClient.Builder()
+                .connectTimeout(12, TimeUnit.SECONDS)
+                .readTimeout(12, TimeUnit.SECONDS)
+                .writeTimeout(12, TimeUnit.SECONDS)
+                .build()
+
             return Retrofit.Builder()
                 .baseUrl(BASE_URL)
-                .addConverterFactory(MoshiConverterFactory.create())
+                .client(okHttpClient)
+                .addConverterFactory(MoshiConverterFactory.create().asLenient())
                 .build()
                 .create(OpenFoodFactsApi::class.java)
         }
