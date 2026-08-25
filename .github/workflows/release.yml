@@ -1,68 +1,153 @@
 name: Build and Release Android APK
 
 on:
+  release:
+    types: [published, created]
   push:
     tags:
       - 'v*'
   workflow_dispatch:
     inputs:
-      version_name:
-        description: 'Release Version Name (e.g. v1.1.3)'
+      tag_name:
+        description: 'Release Tag / Version Name (e.g. v1.1.3)'
         required: false
         default: 'v1.1.3'
+      draft:
+        description: 'Create draft release'
+        required: false
+        type: boolean
+        default: false
+      prerelease:
+        description: 'Mark as pre-release'
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: write
 
 jobs:
   build-and-release:
+    name: Build APK & Publish Release
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Code
+      - name: Checkout Repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
-          cache: 'gradle'
 
-      - name: Grant Execute Permission for Gradle
-        run: chmod +x gradlew || true
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 'wrapper'
+          cache-read-only: false
 
-      - name: Build APK (Release & Debug)
+      - name: Make Gradle Wrapper Executable
+        run: chmod +x gradlew
+
+      - name: Prepare Environment Files
         run: |
-          if [ -f "./gradlew" ]; then
-            ./gradlew assembleDebug --stacktrace
+          if [ ! -f ".env" ] && [ -f ".env.example" ]; then
+            cp .env.example .env
+            echo "Created .env from .env.example"
+          fi
+          touch .env
+
+      - name: Setup Release Keystore (if secret provided)
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 || secrets.SIGNING_KEY }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 --decode > my-upload-key.jks
+            echo "Release keystore decoded successfully."
           else
-            gradle assembleDebug --stacktrace
+            echo "No custom keystore secret found; build will use fallback debug signing configuration."
           fi
 
-      - name: Prepare APK Asset
+      - name: Build Android APKs (Release & Debug)
+        env:
+          STORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD || secrets.STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        run: |
+          ./gradlew assembleRelease assembleDebug --stacktrace --no-daemon
+
+      - name: Package and Organize Release Artifacts
+        id: package_apks
         run: |
           mkdir -p build_output
-          # Find generated debug/release APK
-          APK_FILE=$(find app/build/outputs/apk -name "*.apk" | head -n 1)
-          if [ -n "$APK_FILE" ]; then
-            cp "$APK_FILE" build_output/ChompClock-latest.apk
-            echo "Found APK at $APK_FILE, copied to build_output/ChompClock-latest.apk"
+
+          # Determine version name / tag
+          if [ -n "${{ github.event.release.tag_name }}" ]; then
+            TAG="${{ github.event.release.tag_name }}"
+          elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            TAG="${{ github.ref_name }}"
+          elif [ -n "${{ inputs.tag_name }}" ]; then
+            TAG="${{ inputs.tag_name }}"
           else
-            echo "No APK found in app/build/outputs/apk"
-            exit 1
+            TAG="v1.1.3"
+          fi
+          echo "TARGET_TAG=$TAG" >> $GITHUB_ENV
+          echo "Target tag is: $TAG"
+
+          # Find release APK
+          RELEASE_APK=$(find app/build/outputs/apk/release -name "*.apk" | head -n 1)
+          if [ -n "$RELEASE_APK" ]; then
+            cp "$RELEASE_APK" "build_output/ChompClock-${TAG}-release.apk"
+            cp "$RELEASE_APK" "build_output/ChompClock-release.apk"
+            echo "Release APK packaged: $RELEASE_APK"
+          else
+            echo "Warning: No release APK found in app/build/outputs/apk/release"
           fi
 
-      - name: Create GitHub Release and Upload APK
-        uses: softprops/action-gh-release@v2
-        if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+          # Find debug APK
+          DEBUG_APK=$(find app/build/outputs/apk/debug -name "*.apk" | head -n 1)
+          if [ -n "$DEBUG_APK" ]; then
+            cp "$DEBUG_APK" "build_output/ChompClock-${TAG}-debug.apk"
+            cp "$DEBUG_APK" "build_output/ChompClock-debug.apk"
+            echo "Debug APK packaged: $DEBUG_APK"
+          fi
+
+          # Provide standard latest APK link
+          if [ -f "build_output/ChompClock-release.apk" ]; then
+            cp "build_output/ChompClock-release.apk" "build_output/ChompClock-latest.apk"
+          elif [ -f "build_output/ChompClock-debug.apk" ]; then
+            cp "build_output/ChompClock-debug.apk" "build_output/ChompClock-latest.apk"
+          fi
+
+          # Generate SHA256 Checksums
+          cd build_output
+          sha256sum *.apk > SHA256SUMS.txt || true
+          cd ..
+
+          echo "Listing packaged build outputs:"
+          ls -la build_output/
+
+      - name: Upload Build Artifacts to Workflow Run
+        uses: actions/upload-artifact@v4
         with:
-          name: Release ${{ github.ref_name || github.event.inputs.version_name }}
-          tag_name: ${{ github.ref_name || github.event.inputs.version_name }}
-          draft: false
-          prerelease: false
+          name: ChompClock-APKs-${{ env.TARGET_TAG }}
+          path: build_output/*
+          retention-days: 30
+
+      - name: Publish or Update GitHub Release Assets
+        uses: softprops/action-gh-release@v2
+        if: github.event_name == 'release' || startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+        with:
+          tag_name: ${{ env.TARGET_TAG }}
+          name: Release ${{ env.TARGET_TAG }}
+          draft: ${{ inputs.draft || false }}
+          prerelease: ${{ inputs.prerelease || false }}
           generate_release_notes: true
           files: |
-            build_output/ChompClock-latest.apk
+            build_output/*.apk
+            build_output/SHA256SUMS.txt
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
