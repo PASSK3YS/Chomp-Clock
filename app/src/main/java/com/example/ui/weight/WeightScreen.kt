@@ -10,6 +10,8 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.TrendingDown
+import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -22,11 +24,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.data.local.entity.WeightEntry
+import com.example.data.repository.HeightUnit
 import com.example.data.repository.UserPreferences
 import com.example.data.repository.WeightUnit
 import com.example.ui.components.AvatarPickerDialog
 import com.example.ui.components.UserAvatarView
 import com.example.ui.settings.SettingsViewModel
+import com.example.ui.theme.AppTheme
+import com.example.util.CalorieWeightCalculator
+import com.example.util.WeightTrajectory
 import com.example.util.WeightUtils
 import java.text.SimpleDateFormat
 import java.util.*
@@ -53,7 +59,8 @@ fun WeightScreen(
     val heightCm = userPrefs?.heightCm ?: 170f
     val gender = userPrefs?.gender ?: "Male"
     val weightUnit = userPrefs?.weightUnit ?: WeightUnit.KG
-    val useImperial = userPrefs?.useImperial ?: (weightUnit != WeightUnit.KG)
+    val heightUnit = userPrefs?.heightUnit ?: HeightUnit.CM
+    val useImperial = (heightUnit == HeightUnit.FT_IN || weightUnit != WeightUnit.KG)
 
     val calendar = Calendar.getInstance()
     val greeting = when (calendar.get(Calendar.HOUR_OF_DAY)) {
@@ -63,14 +70,33 @@ fun WeightScreen(
     }
 
     val latestWeight = entries.firstOrNull()?.weightKg ?: 70f
+    val latestWaist = entries.firstOrNull()?.waistCm ?: userPrefs?.waistCm
     val bmi = viewModel.calculateBmi(latestWeight, heightCm)
-    val dailyCalories = viewModel.calculateDailyCalories(latestWeight, heightCm, 30, gender)
+    val dailyTdee = viewModel.calculateDailyCalories(latestWeight, heightCm, 30, gender, latestWaist)
+
+    val calorieBudget = if (userPrefs?.useCustomCalories == true && userPrefs.customDailyCalories > 0) {
+        userPrefs.customDailyCalories
+    } else {
+        dailyTdee
+    }
+
+    val weeklyProjection = remember(calorieBudget, latestWeight, heightCm, latestWaist, gender, weightUnit) {
+        CalorieWeightCalculator.calculateWeeklyProjection(
+            dailyBudget = calorieBudget,
+            weightKg = latestWeight,
+            heightCm = heightCm,
+            waistCm = latestWaist,
+            age = 30,
+            gender = gender,
+            unit = weightUnit
+        )
+    }
 
     val bmiCategory = when {
-        bmi < 18.5f -> "Underweight" to Color(0xFF60A5FA)
-        bmi < 25.0f -> "Normal Weight" to Color(0xFF34D399)
-        bmi < 30.0f -> "Overweight" to Color(0xFFFBBF24)
-        else -> "Obese" to Color(0xFFF87171)
+        bmi < 18.5f -> "Underweight" to AppTheme.colors.primary
+        bmi < 25.0f -> "Normal Weight" to AppTheme.colors.success
+        bmi < 30.0f -> "Overweight" to AppTheme.colors.warning
+        else -> "Obese" to AppTheme.colors.danger
     }
 
     // Date Picker launcher
@@ -83,7 +109,6 @@ fun WeightScreen(
                     set(Calendar.YEAR, year)
                     set(Calendar.MONTH, month)
                     set(Calendar.DAY_OF_MONTH, dayOfMonth)
-                    // Keep current hour/minute
                     set(Calendar.HOUR_OF_DAY, 12)
                     set(Calendar.MINUTE, 0)
                 }
@@ -93,7 +118,6 @@ fun WeightScreen(
             cal.get(Calendar.MONTH),
             cal.get(Calendar.DAY_OF_MONTH)
         )
-        // Disallow future dates
         dialog.datePicker.maxDate = System.currentTimeMillis()
         dialog.show()
     }
@@ -104,11 +128,11 @@ fun WeightScreen(
         val weightStr = WeightUtils.formatWeight(entry.weightKg, weightUnit)
         AlertDialog(
             onDismissRequest = { entryToDelete = null },
-            title = { Text("Delete Weight Log", color = Color.White, fontWeight = FontWeight.Bold) },
+            title = { Text("Delete Weight Log", color = AppTheme.colors.textPrimary, fontWeight = FontWeight.Bold) },
             text = {
                 Text(
                     "Are you sure you want to delete the weigh-in of $weightStr recorded for $dateStr? This action cannot be undone.",
-                    color = Color(0xFFA1A1AA),
+                    color = AppTheme.colors.textSecondary,
                     fontSize = 14.sp
                 )
             },
@@ -118,17 +142,17 @@ fun WeightScreen(
                         viewModel.deleteWeightEntry(entry)
                         entryToDelete = null
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDC2626))
+                    colors = ButtonDefaults.buttonColors(containerColor = AppTheme.colors.danger)
                 ) {
                     Text("Delete", color = Color.White, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { entryToDelete = null }) {
-                    Text("Cancel", color = Color(0xFFA1A1AA))
+                    Text("Cancel", color = AppTheme.colors.textMuted)
                 }
             },
-            containerColor = Color(0xFF18181B),
+            containerColor = AppTheme.colors.surface,
             shape = RoundedCornerShape(16.dp)
         )
     }
@@ -165,7 +189,7 @@ fun WeightScreen(
                     val dateFormat = SimpleDateFormat("dd-MM-yyyy", Locale.UK)
                     Text(
                         text = dateFormat.format(Date()),
-                        color = Color(0xFFA1A1AA),
+                        color = AppTheme.colors.textMuted,
                         style = MaterialTheme.typography.bodySmall,
                         fontWeight = FontWeight.Medium
                     )
@@ -173,18 +197,18 @@ fun WeightScreen(
                         text = "$greeting, $username",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
-                        color = Color.White
+                        color = AppTheme.colors.textPrimary
                     )
                 }
             }
             Surface(
                 shape = RoundedCornerShape(50),
-                color = Color(0xFF18181B),
-                border = BorderStroke(1.dp, Color(0xFF27272A))
+                color = AppTheme.colors.surfaceElevated,
+                border = BorderStroke(1.dp, AppTheme.colors.border)
             ) {
                 Text(
                     text = weightUnit.shortName.uppercase(),
-                    color = Color(0xFF60A5FA),
+                    color = AppTheme.colors.primary,
                     fontWeight = FontWeight.Bold,
                     fontSize = 11.sp,
                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
@@ -197,18 +221,30 @@ fun WeightScreen(
         // Current Metrics Card
         Card(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF18181B)),
-            border = BorderStroke(1.dp, Color(0xFF27272A)),
+            colors = CardDefaults.cardColors(containerColor = AppTheme.colors.surface),
+            border = BorderStroke(1.dp, AppTheme.colors.border),
             shape = RoundedCornerShape(18.dp)
         ) {
             Column(modifier = Modifier.padding(18.dp)) {
-                Text(
-                    "CURRENT METRICS",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = Color(0xFF71717A),
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 1.2.sp
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        "CURRENT METRICS",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = AppTheme.colors.textMuted,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.2.sp
+                    )
+                    Text(
+                        "Height: ${WeightUtils.formatHeight(heightCm, heightUnit)}",
+                        color = AppTheme.colors.textSecondary,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
                 Spacer(modifier = Modifier.height(12.dp))
 
                 Row(
@@ -221,11 +257,11 @@ fun WeightScreen(
                             text = WeightUtils.formatWeight(latestWeight, weightUnit),
                             style = MaterialTheme.typography.headlineMedium,
                             fontWeight = FontWeight.Bold,
-                            color = Color.White
+                            color = AppTheme.colors.textPrimary
                         )
                         Text(
                             text = "Latest Recorded Weight",
-                            color = Color(0xFFA1A1AA),
+                            color = AppTheme.colors.textSecondary,
                             fontSize = 12.sp
                         )
                     }
@@ -255,7 +291,7 @@ fun WeightScreen(
                 }
 
                 Spacer(modifier = Modifier.height(14.dp))
-                HorizontalDivider(color = Color(0xFF27272A))
+                HorizontalDivider(color = AppTheme.colors.border)
                 Spacer(modifier = Modifier.height(12.dp))
 
                 Row(
@@ -263,16 +299,59 @@ fun WeightScreen(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(
-                        "Target Daily Calories",
-                        color = Color(0xFFA1A1AA),
+                        "Estimated Maintenance (TDEE)",
+                        color = AppTheme.colors.textSecondary,
                         fontSize = 13.sp
                     )
                     Text(
-                        "$dailyCalories kcal",
-                        color = Color(0xFF34D399),
+                        "$dailyTdee kcal / day",
+                        color = AppTheme.colors.textPrimary,
                         fontWeight = FontWeight.Bold,
                         fontSize = 13.sp
                     )
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Weekly Weight Loss Projection Card
+                val projColor = when (weeklyProjection.trajectory) {
+                    WeightTrajectory.WEIGHT_LOSS -> AppTheme.colors.success
+                    WeightTrajectory.WEIGHT_GAIN -> AppTheme.colors.warning
+                    WeightTrajectory.MAINTENANCE -> AppTheme.colors.primary
+                }
+
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = projColor.copy(alpha = if (AppTheme.colors.isDark) 0.15f else 0.10f),
+                    border = BorderStroke(1.dp, projColor.copy(alpha = 0.35f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = if (weeklyProjection.trajectory == WeightTrajectory.WEIGHT_LOSS) Icons.Default.TrendingDown else Icons.Default.TrendingUp,
+                                contentDescription = null,
+                                tint = projColor,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = weeklyProjection.summaryText,
+                                color = projColor,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp
+                            )
+                        }
+                        Text(
+                            text = "Budget: $calorieBudget kcal",
+                            color = AppTheme.colors.textSecondary,
+                            fontSize = 11.sp
+                        )
+                    }
                 }
             }
         }
@@ -288,7 +367,7 @@ fun WeightScreen(
             Text(
                 "LOG WEIGHT",
                 style = MaterialTheme.typography.labelSmall,
-                color = Color(0xFF71717A),
+                color = AppTheme.colors.textMuted,
                 fontWeight = FontWeight.Bold,
                 letterSpacing = 1.2.sp
             )
@@ -300,8 +379,8 @@ fun WeightScreen(
             
             Surface(
                 shape = RoundedCornerShape(8.dp),
-                color = if (isToday) Color(0xFF27272A) else Color(0xFF3B82F6).copy(alpha = 0.2f),
-                border = BorderStroke(1.dp, if (isToday) Color(0xFF3F3F46) else Color(0xFF3B82F6)),
+                color = if (isToday) AppTheme.colors.surfaceElevated else AppTheme.colors.primary.copy(alpha = 0.15f),
+                border = BorderStroke(1.dp, if (isToday) AppTheme.colors.border else AppTheme.colors.primary),
                 modifier = Modifier.clickable { openDatePicker() }
             ) {
                 Row(
@@ -311,13 +390,13 @@ fun WeightScreen(
                     Icon(
                         Icons.Default.CalendarToday,
                         contentDescription = "Pick Date",
-                        tint = if (isToday) Color(0xFFA1A1AA) else Color(0xFF60A5FA),
+                        tint = if (isToday) AppTheme.colors.textSecondary else AppTheme.colors.primary,
                         modifier = Modifier.size(13.dp)
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = dateLabel,
-                        color = if (isToday) Color(0xFFD4D4D8) else Color(0xFF60A5FA),
+                        color = if (isToday) AppTheme.colors.textPrimary else AppTheme.colors.primary,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold
                     )
@@ -338,10 +417,12 @@ fun WeightScreen(
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier.weight(1f),
                     colors = OutlinedTextFieldDefaults.colors(
-                        unfocusedContainerColor = Color(0xFF18181B),
-                        focusedContainerColor = Color(0xFF18181B),
-                        unfocusedBorderColor = Color(0xFF27272A),
-                        focusedBorderColor = Color(0xFF3B82F6)
+                        unfocusedContainerColor = AppTheme.colors.inputBackground,
+                        focusedContainerColor = AppTheme.colors.inputBackground,
+                        unfocusedBorderColor = AppTheme.colors.border,
+                        focusedBorderColor = AppTheme.colors.primary,
+                        focusedTextColor = AppTheme.colors.textPrimary,
+                        unfocusedTextColor = AppTheme.colors.textPrimary
                     )
                 )
                 OutlinedTextField(
@@ -351,10 +432,12 @@ fun WeightScreen(
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     modifier = Modifier.weight(1f),
                     colors = OutlinedTextFieldDefaults.colors(
-                        unfocusedContainerColor = Color(0xFF18181B),
-                        focusedContainerColor = Color(0xFF18181B),
-                        unfocusedBorderColor = Color(0xFF27272A),
-                        focusedBorderColor = Color(0xFF3B82F6)
+                        unfocusedContainerColor = AppTheme.colors.inputBackground,
+                        focusedContainerColor = AppTheme.colors.inputBackground,
+                        unfocusedBorderColor = AppTheme.colors.border,
+                        focusedBorderColor = AppTheme.colors.primary,
+                        focusedTextColor = AppTheme.colors.textPrimary,
+                        unfocusedTextColor = AppTheme.colors.textPrimary
                     )
                 )
                 OutlinedTextField(
@@ -364,10 +447,12 @@ fun WeightScreen(
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     modifier = Modifier.weight(1f),
                     colors = OutlinedTextFieldDefaults.colors(
-                        unfocusedContainerColor = Color(0xFF18181B),
-                        focusedContainerColor = Color(0xFF18181B),
-                        unfocusedBorderColor = Color(0xFF27272A),
-                        focusedBorderColor = Color(0xFF3B82F6)
+                        unfocusedContainerColor = AppTheme.colors.inputBackground,
+                        focusedContainerColor = AppTheme.colors.inputBackground,
+                        unfocusedBorderColor = AppTheme.colors.border,
+                        focusedBorderColor = AppTheme.colors.primary,
+                        focusedTextColor = AppTheme.colors.textPrimary,
+                        unfocusedTextColor = AppTheme.colors.textPrimary
                     )
                 )
             }
@@ -383,10 +468,12 @@ fun WeightScreen(
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     modifier = Modifier.weight(1.2f),
                     colors = OutlinedTextFieldDefaults.colors(
-                        unfocusedContainerColor = Color(0xFF18181B),
-                        focusedContainerColor = Color(0xFF18181B),
-                        unfocusedBorderColor = Color(0xFF27272A),
-                        focusedBorderColor = Color(0xFF3B82F6)
+                        unfocusedContainerColor = AppTheme.colors.inputBackground,
+                        focusedContainerColor = AppTheme.colors.inputBackground,
+                        unfocusedBorderColor = AppTheme.colors.border,
+                        focusedBorderColor = AppTheme.colors.primary,
+                        focusedTextColor = AppTheme.colors.textPrimary,
+                        unfocusedTextColor = AppTheme.colors.textPrimary
                     )
                 )
                 OutlinedTextField(
@@ -396,10 +483,12 @@ fun WeightScreen(
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     modifier = Modifier.weight(1f),
                     colors = OutlinedTextFieldDefaults.colors(
-                        unfocusedContainerColor = Color(0xFF18181B),
-                        focusedContainerColor = Color(0xFF18181B),
-                        unfocusedBorderColor = Color(0xFF27272A),
-                        focusedBorderColor = Color(0xFF3B82F6)
+                        unfocusedContainerColor = AppTheme.colors.inputBackground,
+                        focusedContainerColor = AppTheme.colors.inputBackground,
+                        unfocusedBorderColor = AppTheme.colors.border,
+                        focusedBorderColor = AppTheme.colors.primary,
+                        focusedTextColor = AppTheme.colors.textPrimary,
+                        unfocusedTextColor = AppTheme.colors.textPrimary
                     )
                 )
             }
@@ -423,7 +512,6 @@ fun WeightScreen(
                     stoneInput = ""
                     lbsInput = ""
                     waistInput = ""
-                    // Reset to today
                     selectedDateMillis = System.currentTimeMillis()
                 }
             },
@@ -432,8 +520,8 @@ fun WeightScreen(
                 .height(48.dp),
             shape = RoundedCornerShape(14.dp),
             colors = ButtonDefaults.buttonColors(
-                containerColor = Color(0xFFF4F4F5),
-                contentColor = Color.Black
+                containerColor = AppTheme.colors.primary,
+                contentColor = Color.White
             )
         ) {
             val isToday = SimpleDateFormat("yyyyMMdd", Locale.getDefault()).format(Date(selectedDateMillis)) ==
@@ -448,7 +536,7 @@ fun WeightScreen(
         Text(
             "PAST WEIGHT LOGS",
             style = MaterialTheme.typography.labelSmall,
-            color = Color(0xFF71717A),
+            color = AppTheme.colors.textMuted,
             fontWeight = FontWeight.Bold,
             letterSpacing = 1.2.sp
         )
@@ -462,13 +550,13 @@ fun WeightScreen(
                 item {
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
-                        color = Color(0xFF18181B),
+                        color = AppTheme.colors.surface,
                         shape = RoundedCornerShape(14.dp),
-                        border = BorderStroke(1.dp, Color(0xFF27272A))
+                        border = BorderStroke(1.dp, AppTheme.colors.border)
                     ) {
                         Text(
                             "No weight logs recorded yet. Add your current or past weight above!",
-                            color = Color(0xFF71717A),
+                            color = AppTheme.colors.textMuted,
                             style = MaterialTheme.typography.bodySmall,
                             modifier = Modifier.padding(16.dp)
                         )
@@ -478,8 +566,8 @@ fun WeightScreen(
                 items(entries) { entry ->
                     Card(
                         modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFF18181B)),
-                        border = BorderStroke(1.dp, Color(0xFF27272A)),
+                        colors = CardDefaults.cardColors(containerColor = AppTheme.colors.surface),
+                        border = BorderStroke(1.dp, AppTheme.colors.border),
                         shape = RoundedCornerShape(14.dp)
                     ) {
                         Row(
@@ -494,7 +582,7 @@ fun WeightScreen(
                                 Text(
                                     text = dateFormat.format(Date(entry.date)),
                                     fontWeight = FontWeight.Medium,
-                                    color = Color.White,
+                                    color = AppTheme.colors.textPrimary,
                                     fontSize = 14.sp
                                 )
                                 if (entry.waistCm != null && entry.waistCm > 0f) {
@@ -505,7 +593,7 @@ fun WeightScreen(
                                     }
                                     Text(
                                         text = waistStr,
-                                        color = Color(0xFF71717A),
+                                        color = AppTheme.colors.textMuted,
                                         fontSize = 12.sp
                                     )
                                 }
@@ -514,7 +602,7 @@ fun WeightScreen(
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(
                                     text = WeightUtils.formatWeight(entry.weightKg, weightUnit),
-                                    color = Color(0xFF60A5FA),
+                                    color = AppTheme.colors.primary,
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 15.sp
                                 )
@@ -526,7 +614,7 @@ fun WeightScreen(
                                     Icon(
                                         imageVector = Icons.Default.DeleteOutline,
                                         contentDescription = "Delete weight log",
-                                        tint = Color(0xFF71717A),
+                                        tint = AppTheme.colors.textMuted,
                                         modifier = Modifier.size(18.dp)
                                     )
                                 }

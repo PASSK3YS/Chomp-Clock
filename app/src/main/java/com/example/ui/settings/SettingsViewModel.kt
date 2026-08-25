@@ -10,6 +10,8 @@ import com.example.data.remote.GitHubReleaseResponse
 import com.example.data.remote.GitHubService
 import com.example.data.repository.BackupImportResult
 import com.example.data.repository.DataBackupManager
+import com.example.data.repository.HeightUnit
+import com.example.data.repository.ThemeMode
 import com.example.data.repository.UserPreferences
 import com.example.data.repository.UserPreferencesRepository
 import com.example.data.repository.WeightUnit
@@ -63,7 +65,9 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 heightCm = 170f,
                 gender = "Male",
                 weightUnit = WeightUnit.KG,
+                heightUnit = HeightUnit.CM,
                 useImperial = false,
+                themeMode = ThemeMode.DARK,
                 useDarkTheme = true,
                 soundsEnabled = true,
                 avatarId = "icon:🔥"
@@ -78,8 +82,11 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
     fun updateUsername(name: String) = viewModelScope.launch { repository.updateUsername(name) }
     fun updateHeight(cm: Float) = viewModelScope.launch { repository.updateHeight(cm) }
+    fun updateWaist(waistCm: Float?) = viewModelScope.launch { repository.updateWaist(waistCm) }
+    fun updateHeightUnit(unit: HeightUnit) = viewModelScope.launch { repository.updateHeightUnit(unit) }
     fun updateGender(gender: String) = viewModelScope.launch { repository.updateGender(gender) }
     fun updateWeightUnit(unit: WeightUnit) = viewModelScope.launch { repository.updateWeightUnit(unit) }
+    fun updateThemeMode(themeMode: ThemeMode) = viewModelScope.launch { repository.updateThemeMode(themeMode) }
     fun updateUseImperial(useImperial: Boolean) = viewModelScope.launch { repository.updateUseImperial(useImperial) }
     fun updateUseDarkTheme(darkTheme: Boolean) = viewModelScope.launch { repository.updateUseDarkTheme(darkTheme) }
     fun updateSoundsEnabled(sounds: Boolean) = viewModelScope.launch { repository.updateSoundsEnabled(sounds) }

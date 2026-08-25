@@ -38,6 +38,7 @@ import com.example.ui.components.AchievementsDialog
 import com.example.ui.components.AvatarPickerDialog
 import com.example.ui.components.UserAvatarView
 import com.example.ui.settings.SettingsViewModel
+import com.example.ui.theme.AppTheme
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -53,7 +54,6 @@ fun FastingScreen(
     val targetDuration by viewModel.targetDurationMillis.collectAsState()
     val pastSessions by viewModel.pastSessions.collectAsState()
     val streak by viewModel.currentStreak.collectAsState()
-    val achievements by viewModel.achievements.collectAsState()
     val detailedAchievements by viewModel.detailedAchievements.collectAsState()
 
     var showLogPastDialog by remember { mutableStateOf(false) }
@@ -100,7 +100,7 @@ fun FastingScreen(
             title = {
                 Text(
                     text = if (isOvertime) "Complete Fast?" else "End Fast Early?",
-                    color = Color.White,
+                    color = AppTheme.colors.textPrimary,
                     fontWeight = FontWeight.Bold
                 )
             },
@@ -109,7 +109,7 @@ fun FastingScreen(
                     if (isOvertime) {
                         Text(
                             text = "🎉 Awesome effort! You reached your $targetH-hour goal and completed ${elapsedH}h ${elapsedM}m total fasting time.",
-                            color = Color(0xFF34D399),
+                            color = AppTheme.colors.success,
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Medium
                         )
@@ -119,14 +119,14 @@ fun FastingScreen(
                         val remM = (remainingSec % 3600) / 60
                         Text(
                             text = "You have fasted for ${elapsedH}h ${elapsedM}m out of your $targetH-hour goal (${remH}h ${remM}m remaining).",
-                            color = Color(0xFFA1A1AA),
+                            color = AppTheme.colors.textSecondary,
                             fontSize = 14.sp
                         )
                     }
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = "Are you sure you want to end this fasting session and record it in your history?",
-                        color = Color(0xFFD4D4D8),
+                        color = AppTheme.colors.textPrimary,
                         fontSize = 13.sp
                     )
                 }
@@ -138,7 +138,7 @@ fun FastingScreen(
                         viewModel.endFast()
                     },
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = if (isOvertime) Color(0xFF10B981) else Color(0xFFDC2626)
+                        containerColor = if (isOvertime) AppTheme.colors.success else AppTheme.colors.danger
                     ),
                     shape = RoundedCornerShape(10.dp)
                 ) {
@@ -151,10 +151,10 @@ fun FastingScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showEndFastConfirmDialog = false }) {
-                    Text("Keep Fasting", color = Color(0xFF60A5FA), fontWeight = FontWeight.SemiBold)
+                    Text("Keep Fasting", color = AppTheme.colors.primary, fontWeight = FontWeight.SemiBold)
                 }
             },
-            containerColor = Color(0xFF18181B),
+            containerColor = AppTheme.colors.surface,
             shape = RoundedCornerShape(18.dp)
         )
     }
@@ -199,11 +199,11 @@ fun FastingScreen(
         val dateStr = SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.getDefault()).format(Date(session.startTime))
         AlertDialog(
             onDismissRequest = { fastToDelete = null },
-            title = { Text("Delete Fast Record", color = Color.White, fontWeight = FontWeight.Bold) },
+            title = { Text("Delete Fast Record", color = AppTheme.colors.textPrimary, fontWeight = FontWeight.Bold) },
             text = {
                 Text(
                     "Are you sure you want to delete this completed fast of ${String.format(Locale.getDefault(), "%.1f", durationHrs)} hrs recorded on $dateStr? This action cannot be undone.",
-                    color = Color(0xFFA1A1AA),
+                    color = AppTheme.colors.textSecondary,
                     fontSize = 14.sp
                 )
             },
@@ -213,17 +213,17 @@ fun FastingScreen(
                         viewModel.deleteSession(session)
                         fastToDelete = null
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDC2626))
+                    colors = ButtonDefaults.buttonColors(containerColor = AppTheme.colors.danger)
                 ) {
                     Text("Delete", color = Color.White, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { fastToDelete = null }) {
-                    Text("Cancel", color = Color(0xFFA1A1AA))
+                    Text("Cancel", color = AppTheme.colors.textMuted)
                 }
             },
-            containerColor = Color(0xFF18181B),
+            containerColor = AppTheme.colors.surface,
             shape = RoundedCornerShape(16.dp)
         )
     }
@@ -260,7 +260,7 @@ fun FastingScreen(
                     val dateFormat = SimpleDateFormat("dd-MM-yyyy", Locale.UK)
                     Text(
                         text = dateFormat.format(Date()),
-                        color = Color(0xFFA1A1AA),
+                        color = AppTheme.colors.textMuted,
                         style = MaterialTheme.typography.bodySmall,
                         fontWeight = FontWeight.Medium
                     )
@@ -268,7 +268,7 @@ fun FastingScreen(
                         text = "$greeting, $username",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
-                        color = Color.White
+                        color = AppTheme.colors.textPrimary
                     )
                 }
             }
@@ -277,9 +277,9 @@ fun FastingScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Surface(
-                    color = Color(0xFF18181B),
+                    color = AppTheme.colors.surfaceElevated,
                     shape = RoundedCornerShape(50),
-                    border = BorderStroke(1.dp, Color(0xFF27272A))
+                    border = BorderStroke(1.dp, AppTheme.colors.border)
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
@@ -288,7 +288,7 @@ fun FastingScreen(
                         Text("🔥", fontSize = 12.sp, modifier = Modifier.padding(end = 4.dp))
                         Text(
                             text = "$streak",
-                            color = Color(0xFFFFEDD5),
+                            color = AppTheme.colors.warning,
                             fontWeight = FontWeight.Bold,
                             style = MaterialTheme.typography.bodyMedium
                         )
@@ -296,9 +296,9 @@ fun FastingScreen(
                 }
                 Surface(
                     onClick = { showAchievementsDialog = true },
-                    color = Color(0xFF18181B),
+                    color = AppTheme.colors.surfaceElevated,
                     shape = CircleShape,
-                    border = BorderStroke(1.dp, Color(0xFF27272A)),
+                    border = BorderStroke(1.dp, AppTheme.colors.border),
                     modifier = Modifier.size(38.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
@@ -341,20 +341,20 @@ fun FastingScreen(
                     CircularProgressIndicator(
                         progress = { 1f },
                         modifier = Modifier.fillMaxSize(),
-                        color = Color(0xFF1F1F23),
+                        color = AppTheme.colors.surfaceElevated,
                         strokeWidth = 10.dp
                     )
                     CircularProgressIndicator(
                         progress = { progress },
                         modifier = Modifier.fillMaxSize(),
-                        color = if (isOvertime) Color(0xFF34D399) else Color(0xFF3B82F6),
+                        color = if (isOvertime) AppTheme.colors.success else AppTheme.colors.primary,
                         strokeWidth = 10.dp,
                         strokeCap = StrokeCap.Round
                     )
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
                             text = if (isOvertime) "COMPLETED (+OVERTIME)" else "REMAINING",
-                            color = if (isOvertime) Color(0xFF34D399) else Color(0xFFA1A1AA),
+                            color = if (isOvertime) AppTheme.colors.success else AppTheme.colors.textMuted,
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
                             letterSpacing = 1.5.sp
@@ -365,11 +365,11 @@ fun FastingScreen(
                             style = MaterialTheme.typography.headlineMedium,
                             fontWeight = FontWeight.Bold,
                             fontFamily = FontFamily.Monospace,
-                            color = Color.White
+                            color = AppTheme.colors.textPrimary
                         )
                         Text(
                             text = "Goal: ${targetHoursFormatted.removeSuffix(".0")} Hours",
-                            color = Color(0xFF71717A),
+                            color = AppTheme.colors.textSecondary,
                             style = MaterialTheme.typography.bodySmall,
                             modifier = Modifier.padding(top = 4.dp)
                         )
@@ -390,14 +390,14 @@ fun FastingScreen(
                 )
                 Surface(
                     modifier = Modifier.weight(1f),
-                    color = Color(0xFF18181B),
+                    color = AppTheme.colors.surface,
                     shape = RoundedCornerShape(16.dp),
-                    border = BorderStroke(1.dp, Color(0xFF27272A))
+                    border = BorderStroke(1.dp, AppTheme.colors.border)
                 ) {
                     Column(modifier = Modifier.padding(12.dp)) {
                         Text(
                             "ELAPSED TIME",
-                            color = Color(0xFF71717A),
+                            color = AppTheme.colors.textMuted,
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
                             letterSpacing = 1.sp
@@ -407,7 +407,7 @@ fun FastingScreen(
                         val elapsedM = (totalSeconds % 3600) / 60
                         Text(
                             "${elapsedH}h ${elapsedM}m",
-                            color = Color(0xFF34D399),
+                            color = AppTheme.colors.success,
                             fontWeight = FontWeight.SemiBold,
                             style = MaterialTheme.typography.bodyMedium
                         )
@@ -432,10 +432,10 @@ fun FastingScreen(
                     .height(52.dp),
                 shape = RoundedCornerShape(16.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFF18181B),
-                    contentColor = Color(0xFFF87171)
+                    containerColor = AppTheme.colors.surface,
+                    contentColor = AppTheme.colors.danger
                 ),
-                border = BorderStroke(1.dp, Color(0xFF7F1D1D))
+                border = BorderStroke(1.dp, AppTheme.colors.danger.copy(alpha = 0.5f))
             ) {
                 Text("End Fast", fontWeight = FontWeight.Bold, fontSize = 15.sp)
             }
@@ -443,7 +443,7 @@ fun FastingScreen(
             Text(
                 "START A FAST",
                 style = MaterialTheme.typography.labelSmall,
-                color = Color(0xFF71717A),
+                color = AppTheme.colors.textMuted,
                 fontWeight = FontWeight.Bold,
                 letterSpacing = 1.2.sp
             )
@@ -464,15 +464,15 @@ fun FastingScreen(
                             .weight(1f)
                             .clickable { viewModel.startFast(duration) },
                         shape = RoundedCornerShape(16.dp),
-                        color = Color(0xFF18181B),
-                        border = BorderStroke(1.dp, Color(0xFF27272A))
+                        color = AppTheme.colors.surface,
+                        border = BorderStroke(1.dp, AppTheme.colors.border)
                     ) {
                         Column(
                             modifier = Modifier.padding(12.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            Text(label, fontWeight = FontWeight.Bold, color = Color.White, fontSize = 16.sp)
-                            Text(sub, color = Color(0xFF71717A), fontSize = 11.sp)
+                            Text(label, fontWeight = FontWeight.Bold, color = AppTheme.colors.textPrimary, fontSize = 16.sp)
+                            Text(sub, color = AppTheme.colors.textMuted, fontSize = 11.sp)
                         }
                     }
                 }
@@ -486,8 +486,8 @@ fun FastingScreen(
                     .fillMaxWidth()
                     .clickable { showCustomFastDialog = true },
                 shape = RoundedCornerShape(16.dp),
-                color = Color(0xFF18181B),
-                border = BorderStroke(1.dp, Color(0xFF3B82F6).copy(alpha = 0.5f))
+                color = AppTheme.colors.surface,
+                border = BorderStroke(1.dp, AppTheme.colors.primary.copy(alpha = 0.5f))
             ) {
                 Row(
                     modifier = Modifier.padding(14.dp),
@@ -498,16 +498,16 @@ fun FastingScreen(
                         Icon(
                             Icons.Default.Tune,
                             contentDescription = null,
-                            tint = Color(0xFF60A5FA),
+                            tint = AppTheme.colors.primary,
                             modifier = Modifier.size(20.dp)
                         )
                         Spacer(modifier = Modifier.width(10.dp))
                         Column {
-                            Text("Custom Fast Duration", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 14.sp)
-                            Text("Set custom hours and minutes (e.g. 12h - 72h)", color = Color(0xFFA1A1AA), fontSize = 12.sp)
+                            Text("Custom Fast Duration", fontWeight = FontWeight.Bold, color = AppTheme.colors.textPrimary, fontSize = 14.sp)
+                            Text("Set custom hours and minutes (e.g. 12h - 72h)", color = AppTheme.colors.textSecondary, fontSize = 12.sp)
                         }
                     }
-                    Icon(Icons.Default.PlayArrow, contentDescription = "Open", tint = Color(0xFF60A5FA))
+                    Icon(Icons.Default.PlayArrow, contentDescription = "Open", tint = AppTheme.colors.primary)
                 }
             }
 
@@ -521,7 +521,7 @@ fun FastingScreen(
             Text(
                 "RECENT FASTS",
                 style = MaterialTheme.typography.labelSmall,
-                color = Color(0xFF71717A),
+                color = AppTheme.colors.textMuted,
                 fontWeight = FontWeight.Bold,
                 letterSpacing = 1.2.sp
             )
@@ -532,13 +532,13 @@ fun FastingScreen(
                     item {
                         Surface(
                             modifier = Modifier.fillMaxWidth(),
-                            color = Color(0xFF18181B),
+                            color = AppTheme.colors.surface,
                             shape = RoundedCornerShape(16.dp),
-                            border = BorderStroke(1.dp, Color(0xFF27272A))
+                            border = BorderStroke(1.dp, AppTheme.colors.border)
                         ) {
                             Text(
                                 "No fasts completed yet. Tap a preset above to begin!",
-                                color = Color(0xFF71717A),
+                                color = AppTheme.colors.textMuted,
                                 style = MaterialTheme.typography.bodySmall,
                                 modifier = Modifier.padding(16.dp)
                             )
@@ -555,8 +555,8 @@ fun FastingScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(vertical = 4.dp),
-                            colors = CardDefaults.cardColors(containerColor = Color(0xFF18181B)),
-                            border = BorderStroke(1.dp, Color(0xFF27272A)),
+                            colors = CardDefaults.cardColors(containerColor = AppTheme.colors.surface),
+                            border = BorderStroke(1.dp, AppTheme.colors.border),
                             shape = RoundedCornerShape(14.dp)
                         ) {
                             Row(
@@ -570,24 +570,24 @@ fun FastingScreen(
                                     Text(
                                         dateFormat.format(Date(session.startTime)),
                                         fontWeight = FontWeight.Medium,
-                                        color = Color.White,
+                                        color = AppTheme.colors.textPrimary,
                                         fontSize = 13.sp
                                     )
                                     Text(
                                         "Target: ${String.format(Locale.getDefault(), "%.0fh", targetHrs)}",
                                         style = MaterialTheme.typography.bodySmall,
-                                        color = Color(0xFF71717A)
+                                        color = AppTheme.colors.textMuted
                                     )
                                 }
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Surface(
                                         shape = RoundedCornerShape(8.dp),
-                                        color = if (hitGoal) Color(0xFF064E3B) else Color(0xFF27272A),
-                                        border = BorderStroke(1.dp, if (hitGoal) Color(0xFF059669) else Color(0xFF3F3F46))
+                                        color = if (hitGoal) AppTheme.colors.success.copy(alpha = 0.15f) else AppTheme.colors.surfaceElevated,
+                                        border = BorderStroke(1.dp, if (hitGoal) AppTheme.colors.success.copy(alpha = 0.4f) else AppTheme.colors.border)
                                     ) {
                                         Text(
                                             text = "${String.format(Locale.getDefault(), "%.1f", durationHrs)} hrs ${if (hitGoal) "✓" else ""}",
-                                            color = if (hitGoal) Color(0xFF34D399) else Color(0xFFA1A1AA),
+                                            color = if (hitGoal) AppTheme.colors.success else AppTheme.colors.textSecondary,
                                             fontWeight = FontWeight.Bold,
                                             fontSize = 12.sp,
                                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
@@ -601,7 +601,7 @@ fun FastingScreen(
                                         Icon(
                                             imageVector = Icons.Default.DeleteOutline,
                                             contentDescription = "Delete fast log",
-                                            tint = Color(0xFF71717A),
+                                            tint = AppTheme.colors.textMuted,
                                             modifier = Modifier.size(17.dp)
                                         )
                                     }
@@ -622,8 +622,8 @@ fun FastingScreen(
                 .height(48.dp),
             shape = RoundedCornerShape(14.dp),
             colors = ButtonDefaults.buttonColors(
-                containerColor = Color(0xFFF4F4F5),
-                contentColor = Color.Black
+                containerColor = AppTheme.colors.primary,
+                contentColor = Color.White
             )
         ) {
             Text("Log Past Fast Manually", fontWeight = FontWeight.Bold, fontSize = 14.sp)
@@ -641,7 +641,7 @@ fun MetabolicStageBox(
 
     Surface(
         modifier = modifier.clickable { onClick() },
-        color = Color(0xFF18181B),
+        color = AppTheme.colors.surface,
         shape = RoundedCornerShape(16.dp),
         border = BorderStroke(1.dp, stage.accentColor.copy(alpha = 0.5f))
     ) {
@@ -653,7 +653,7 @@ fun MetabolicStageBox(
             ) {
                 Text(
                     "METABOLIC STATE",
-                    color = Color(0xFF71717A),
+                    color = AppTheme.colors.textMuted,
                     fontSize = 10.sp,
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 1.sp
@@ -670,7 +670,7 @@ fun MetabolicStageBox(
             )
             Text(
                 "Fuel: ${stage.primaryFuelSource.take(24)}...",
-                color = Color(0xFF71717A),
+                color = AppTheme.colors.textSecondary,
                 fontSize = 10.sp,
                 maxLines = 1
             )
@@ -690,8 +690,8 @@ fun MetabolicProgressionBar(
             .fillMaxWidth()
             .clickable { onClick() },
         shape = RoundedCornerShape(16.dp),
-        color = Color(0xFF18181B),
-        border = BorderStroke(1.dp, Color(0xFF27272A))
+        color = AppTheme.colors.surface,
+        border = BorderStroke(1.dp, AppTheme.colors.border)
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
             Row(
@@ -704,7 +704,7 @@ fun MetabolicProgressionBar(
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         "METABOLIC MILESTONES",
-                        color = Color(0xFF71717A),
+                        color = AppTheme.colors.textMuted,
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 1.sp
@@ -713,7 +713,7 @@ fun MetabolicProgressionBar(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         "Guide & Science",
-                        color = Color(0xFF60A5FA),
+                        color = AppTheme.colors.primary,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.SemiBold
                     )
@@ -721,7 +721,7 @@ fun MetabolicProgressionBar(
                     Icon(
                         Icons.Default.PlayArrow,
                         contentDescription = null,
-                        tint = Color(0xFF60A5FA),
+                        tint = AppTheme.colors.primary,
                         modifier = Modifier.size(12.dp)
                     )
                 }
@@ -742,15 +742,15 @@ fun MetabolicProgressionBar(
                         shape = RoundedCornerShape(6.dp),
                         color = when {
                             isCurrent -> stage.accentColor.copy(alpha = 0.25f)
-                            isPast -> Color(0xFF064E3B)
-                            else -> Color(0xFF27272A)
+                            isPast -> AppTheme.colors.success.copy(alpha = 0.2f)
+                            else -> AppTheme.colors.surfaceElevated
                         },
                         border = BorderStroke(
                             1.dp,
                             when {
                                 isCurrent -> stage.accentColor
-                                isPast -> Color(0xFF059669)
-                                else -> Color(0xFF3F3F46)
+                                isPast -> AppTheme.colors.success.copy(alpha = 0.5f)
+                                else -> AppTheme.colors.border
                             }
                         ),
                         modifier = Modifier.weight(1f)
@@ -767,8 +767,8 @@ fun MetabolicProgressionBar(
                                 text = "${stage.hourStart.toInt()}h",
                                 color = when {
                                     isCurrent -> stage.accentColor
-                                    isPast -> Color(0xFF34D399)
-                                    else -> Color(0xFF71717A)
+                                    isPast -> AppTheme.colors.success
+                                    else -> AppTheme.colors.textMuted
                                 },
                                 fontSize = 8.sp,
                                 fontWeight = FontWeight.Bold
@@ -790,8 +790,8 @@ fun MetabolicSciencePreviewCard(
             .fillMaxWidth()
             .clickable { onClick() },
         shape = RoundedCornerShape(14.dp),
-        color = Color(0xFF18181B),
-        border = BorderStroke(1.dp, Color(0xFF3B82F6).copy(alpha = 0.35f))
+        color = AppTheme.colors.surface,
+        border = BorderStroke(1.dp, AppTheme.colors.primary.copy(alpha = 0.35f))
     ) {
         Row(
             modifier = Modifier
@@ -806,8 +806,8 @@ fun MetabolicSciencePreviewCard(
             ) {
                 Surface(
                     shape = RoundedCornerShape(10.dp),
-                    color = Color(0xFF3B82F6).copy(alpha = 0.15f),
-                    border = BorderStroke(1.dp, Color(0xFF3B82F6).copy(alpha = 0.35f)),
+                    color = AppTheme.colors.primary.copy(alpha = 0.15f),
+                    border = BorderStroke(1.dp, AppTheme.colors.primary.copy(alpha = 0.35f)),
                     modifier = Modifier.size(36.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
@@ -818,14 +818,14 @@ fun MetabolicSciencePreviewCard(
                 Column {
                     Text(
                         "METABOLIC STATES GUIDE",
-                        color = Color(0xFF60A5FA),
+                        color = AppTheme.colors.primary,
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 0.8.sp
                     )
                     Text(
                         "7 Stages • Biomarkers & Science",
-                        color = Color(0xFFE4E4E7),
+                        color = AppTheme.colors.textPrimary,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold
                     )
@@ -834,8 +834,8 @@ fun MetabolicSciencePreviewCard(
 
             Surface(
                 shape = RoundedCornerShape(8.dp),
-                color = Color(0xFF1E293B),
-                border = BorderStroke(1.dp, Color(0xFF334155))
+                color = AppTheme.colors.surfaceElevated,
+                border = BorderStroke(1.dp, AppTheme.colors.border)
             ) {
                 Row(
                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
@@ -843,7 +843,7 @@ fun MetabolicSciencePreviewCard(
                 ) {
                     Text(
                         "Guide",
-                        color = Color(0xFF60A5FA),
+                        color = AppTheme.colors.primary,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -851,7 +851,7 @@ fun MetabolicSciencePreviewCard(
                     Icon(
                         Icons.AutoMirrored.Filled.ArrowForward,
                         contentDescription = "Open Guide",
-                        tint = Color(0xFF60A5FA),
+                        tint = AppTheme.colors.primary,
                         modifier = Modifier.size(13.dp)
                     )
                 }
@@ -868,8 +868,8 @@ fun LogPastFastDialog(onDismiss: () -> Unit, onSave: (Long, Long, Long) -> Unit)
     Dialog(onDismissRequest = onDismiss) {
         Surface(
             shape = RoundedCornerShape(20.dp),
-            color = Color(0xFF18181B),
-            border = BorderStroke(1.dp, Color(0xFF27272A)),
+            color = AppTheme.colors.surface,
+            border = BorderStroke(1.dp, AppTheme.colors.border),
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(modifier = Modifier.padding(20.dp)) {
@@ -877,7 +877,7 @@ fun LogPastFastDialog(onDismiss: () -> Unit, onSave: (Long, Long, Long) -> Unit)
                     "LOG COMPLETED FAST",
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Bold,
-                    color = Color(0xFFA1A1AA),
+                    color = AppTheme.colors.textMuted,
                     letterSpacing = 1.2.sp
                 )
                 Spacer(modifier = Modifier.height(16.dp))
@@ -888,10 +888,12 @@ fun LogPastFastDialog(onDismiss: () -> Unit, onSave: (Long, Long, Long) -> Unit)
                     label = { Text("Fast Duration (Hours)") },
                     modifier = Modifier.fillMaxWidth(),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Color(0xFF3B82F6),
-                        unfocusedBorderColor = Color(0xFF27272A),
-                        focusedContainerColor = Color(0xFF27272A),
-                        unfocusedContainerColor = Color(0xFF27272A)
+                        focusedBorderColor = AppTheme.colors.primary,
+                        unfocusedBorderColor = AppTheme.colors.border,
+                        focusedContainerColor = AppTheme.colors.inputBackground,
+                        unfocusedContainerColor = AppTheme.colors.inputBackground,
+                        focusedTextColor = AppTheme.colors.textPrimary,
+                        unfocusedTextColor = AppTheme.colors.textPrimary
                     )
                 )
                 Spacer(modifier = Modifier.height(8.dp))
@@ -902,10 +904,12 @@ fun LogPastFastDialog(onDismiss: () -> Unit, onSave: (Long, Long, Long) -> Unit)
                     label = { Text("How many days ago?") },
                     modifier = Modifier.fillMaxWidth(),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Color(0xFF3B82F6),
-                        unfocusedBorderColor = Color(0xFF27272A),
-                        focusedContainerColor = Color(0xFF27272A),
-                        unfocusedContainerColor = Color(0xFF27272A)
+                        focusedBorderColor = AppTheme.colors.primary,
+                        unfocusedBorderColor = AppTheme.colors.border,
+                        focusedContainerColor = AppTheme.colors.inputBackground,
+                        unfocusedContainerColor = AppTheme.colors.inputBackground,
+                        focusedTextColor = AppTheme.colors.textPrimary,
+                        unfocusedTextColor = AppTheme.colors.textPrimary
                     )
                 )
 
@@ -916,7 +920,7 @@ fun LogPastFastDialog(onDismiss: () -> Unit, onSave: (Long, Long, Long) -> Unit)
                     horizontalArrangement = Arrangement.End
                 ) {
                     TextButton(onClick = onDismiss) {
-                        Text("Cancel", color = Color(0xFFA1A1AA))
+                        Text("Cancel", color = AppTheme.colors.textMuted)
                     }
                     Spacer(modifier = Modifier.width(8.dp))
                     Button(
@@ -927,9 +931,9 @@ fun LogPastFastDialog(onDismiss: () -> Unit, onSave: (Long, Long, Long) -> Unit)
                             val start = end - (h * 3600 * 1000).toLong()
                             onSave(start, end, (h * 3600 * 1000).toLong())
                         },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3B82F6))
+                        colors = ButtonDefaults.buttonColors(containerColor = AppTheme.colors.primary)
                     ) {
-                        Text("Save Record")
+                        Text("Save Record", color = Color.White, fontWeight = FontWeight.Bold)
                     }
                 }
             }

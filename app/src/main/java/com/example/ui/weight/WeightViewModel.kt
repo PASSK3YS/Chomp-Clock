@@ -5,11 +5,13 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.local.AppDatabase
 import com.example.data.local.entity.WeightEntry
+import com.example.data.repository.WeightUnit
+import com.example.util.CalorieWeightCalculator
+import com.example.util.WeeklyWeightProjection
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import java.util.Calendar
 
 class WeightViewModel(application: Application) : AndroidViewModel(application) {
     private val db = AppDatabase.getDatabase(application)
@@ -42,13 +44,33 @@ class WeightViewModel(application: Application) : AndroidViewModel(application) 
         return weightKg / (heightM * heightM)
     }
 
-    fun calculateDailyCalories(weightKg: Float, heightCm: Float, age: Int = 30, gender: String = "Male"): Int {
-        // Mifflin-St Jeor Equation
-        val bmr = (10 * weightKg) + (6.25f * heightCm) - (5 * age)
-        return if (gender.equals("Male", ignoreCase = true)) {
-            (bmr + 5).toInt()
-        } else {
-            (bmr - 161).toInt()
-        }
+    fun calculateDailyCalories(
+        weightKg: Float,
+        heightCm: Float,
+        age: Int = 30,
+        gender: String = "Male",
+        waistCm: Float? = null
+    ): Int {
+        return CalorieWeightCalculator.calculateTdee(weightKg, heightCm, waistCm, age, gender)
+    }
+
+    fun calculateWeeklyWeightProjection(
+        dailyBudget: Int,
+        weightKg: Float,
+        heightCm: Float,
+        waistCm: Float? = null,
+        age: Int = 30,
+        gender: String = "Male",
+        unit: WeightUnit = WeightUnit.KG
+    ): WeeklyWeightProjection {
+        return CalorieWeightCalculator.calculateWeeklyProjection(
+            dailyBudget = dailyBudget,
+            weightKg = weightKg,
+            heightCm = heightCm,
+            waistCm = waistCm,
+            age = age,
+            gender = gender,
+            unit = unit
+        )
     }
 }

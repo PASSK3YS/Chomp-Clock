@@ -24,6 +24,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import com.example.ui.theme.AppTheme
 
 @Composable
 fun CustomFastDialog(
@@ -50,8 +51,8 @@ fun CustomFastDialog(
     Dialog(onDismissRequest = onDismiss) {
         Surface(
             shape = RoundedCornerShape(24.dp),
-            color = Color(0xFF18181B),
-            border = BorderStroke(1.dp, Color(0xFF27272A)),
+            color = AppTheme.colors.surface,
+            border = BorderStroke(1.dp, AppTheme.colors.border),
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(
@@ -67,7 +68,7 @@ fun CustomFastDialog(
                         Icon(
                             imageVector = Icons.Default.Timer,
                             contentDescription = null,
-                            tint = Color(0xFF60A5FA),
+                            tint = AppTheme.colors.primary,
                             modifier = Modifier.size(20.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
@@ -76,7 +77,7 @@ fun CustomFastDialog(
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.Bold,
                             letterSpacing = 1.2.sp,
-                            color = Color(0xFFA1A1AA)
+                            color = AppTheme.colors.textMuted
                         )
                     }
                     IconButton(
@@ -86,7 +87,7 @@ fun CustomFastDialog(
                         Icon(
                             imageVector = Icons.Default.Close,
                             contentDescription = "Close",
-                            tint = Color(0xFFA1A1AA)
+                            tint = AppTheme.colors.textMuted
                         )
                     }
                 }
@@ -96,7 +97,7 @@ fun CustomFastDialog(
                 // Quick preset pills
                 Text(
                     text = "Quick Presets",
-                    color = Color(0xFF71717A),
+                    color = AppTheme.colors.textMuted,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Medium,
                     modifier = Modifier.align(Alignment.Start)
@@ -110,10 +111,10 @@ fun CustomFastDialog(
                         val isSelected = currentHours == presetH && currentMinutes == 0
                         Surface(
                             shape = RoundedCornerShape(12.dp),
-                            color = if (isSelected) Color(0xFF3B82F6).copy(alpha = 0.25f) else Color(0xFF27272A),
+                            color = if (isSelected) AppTheme.colors.primary.copy(alpha = 0.25f) else AppTheme.colors.surfaceElevated,
                             border = BorderStroke(
                                 1.dp,
-                                if (isSelected) Color(0xFF3B82F6) else Color(0xFF3F3F46)
+                                if (isSelected) AppTheme.colors.primary else AppTheme.colors.border
                             ),
                             modifier = Modifier.clickable {
                                 hoursInput = presetH.toString()
@@ -122,7 +123,7 @@ fun CustomFastDialog(
                         ) {
                             Text(
                                 text = "${presetH}h",
-                                color = if (isSelected) Color(0xFF60A5FA) else Color.White,
+                                color = if (isSelected) AppTheme.colors.primary else AppTheme.colors.textPrimary,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 13.sp,
                                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
@@ -142,7 +143,7 @@ fun CustomFastDialog(
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = "Hours",
-                            color = Color(0xFFA1A1AA),
+                            color = AppTheme.colors.textSecondary,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Medium
                         )
@@ -150,8 +151,8 @@ fun CustomFastDialog(
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
-                                .background(Color(0xFF27272A), RoundedCornerShape(12.dp))
-                                .border(1.dp, Color(0xFF3F3F46), RoundedCornerShape(12.dp))
+                                .background(AppTheme.colors.surfaceElevated, RoundedCornerShape(12.dp))
+                                .border(1.dp, AppTheme.colors.border, RoundedCornerShape(12.dp))
                                 .padding(horizontal = 6.dp)
                         ) {
                             IconButton(
@@ -161,7 +162,7 @@ fun CustomFastDialog(
                                 },
                                 modifier = Modifier.size(32.dp)
                             ) {
-                                Icon(Icons.Default.Remove, contentDescription = "Decrease", tint = Color.White, modifier = Modifier.size(16.dp))
+                                Icon(Icons.Default.Remove, contentDescription = "Decrease", tint = AppTheme.colors.textPrimary, modifier = Modifier.size(16.dp))
                             }
                             OutlinedTextField(
                                 value = hoursInput,
@@ -171,11 +172,13 @@ fun CustomFastDialog(
                                 textStyle = MaterialTheme.typography.titleMedium.copy(
                                     textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                                     fontWeight = FontWeight.Bold,
-                                    color = Color.White
+                                    color = AppTheme.colors.textPrimary
                                 ),
                                 colors = OutlinedTextFieldDefaults.colors(
                                     focusedBorderColor = Color.Transparent,
-                                    unfocusedBorderColor = Color.Transparent
+                                    unfocusedBorderColor = Color.Transparent,
+                                    focusedTextColor = AppTheme.colors.textPrimary,
+                                    unfocusedTextColor = AppTheme.colors.textPrimary
                                 ),
                                 singleLine = true
                             )
@@ -186,7 +189,7 @@ fun CustomFastDialog(
                                 },
                                 modifier = Modifier.size(32.dp)
                             ) {
-                                Icon(Icons.Default.Add, contentDescription = "Increase", tint = Color.White, modifier = Modifier.size(16.dp))
+                                Icon(Icons.Default.Add, contentDescription = "Increase", tint = AppTheme.colors.textPrimary, modifier = Modifier.size(16.dp))
                             }
                         }
                     }
@@ -195,7 +198,7 @@ fun CustomFastDialog(
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = "Minutes",
-                            color = Color(0xFFA1A1AA),
+                            color = AppTheme.colors.textSecondary,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Medium
                         )
@@ -203,8 +206,8 @@ fun CustomFastDialog(
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
-                                .background(Color(0xFF27272A), RoundedCornerShape(12.dp))
-                                .border(1.dp, Color(0xFF3F3F46), RoundedCornerShape(12.dp))
+                                .background(AppTheme.colors.surfaceElevated, RoundedCornerShape(12.dp))
+                                .border(1.dp, AppTheme.colors.border, RoundedCornerShape(12.dp))
                                 .padding(horizontal = 6.dp)
                         ) {
                             IconButton(
@@ -214,7 +217,7 @@ fun CustomFastDialog(
                                 },
                                 modifier = Modifier.size(32.dp)
                             ) {
-                                Icon(Icons.Default.Remove, contentDescription = "Decrease", tint = Color.White, modifier = Modifier.size(16.dp))
+                                Icon(Icons.Default.Remove, contentDescription = "Decrease", tint = AppTheme.colors.textPrimary, modifier = Modifier.size(16.dp))
                             }
                             OutlinedTextField(
                                 value = minutesInput,
@@ -224,11 +227,13 @@ fun CustomFastDialog(
                                 textStyle = MaterialTheme.typography.titleMedium.copy(
                                     textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                                     fontWeight = FontWeight.Bold,
-                                    color = Color.White
+                                    color = AppTheme.colors.textPrimary
                                 ),
                                 colors = OutlinedTextFieldDefaults.colors(
                                     focusedBorderColor = Color.Transparent,
-                                    unfocusedBorderColor = Color.Transparent
+                                    unfocusedBorderColor = Color.Transparent,
+                                    focusedTextColor = AppTheme.colors.textPrimary,
+                                    unfocusedTextColor = AppTheme.colors.textPrimary
                                 ),
                                 singleLine = true
                             )
@@ -239,7 +244,7 @@ fun CustomFastDialog(
                                 },
                                 modifier = Modifier.size(32.dp)
                             ) {
-                                Icon(Icons.Default.Add, contentDescription = "Increase", tint = Color.White, modifier = Modifier.size(16.dp))
+                                Icon(Icons.Default.Add, contentDescription = "Increase", tint = AppTheme.colors.textPrimary, modifier = Modifier.size(16.dp))
                             }
                         }
                     }
@@ -250,14 +255,14 @@ fun CustomFastDialog(
                 // Stage Info Preview Card
                 Surface(
                     shape = RoundedCornerShape(12.dp),
-                    color = Color(0xFF27272A),
-                    border = BorderStroke(1.dp, Color(0xFF3F3F46)),
+                    color = AppTheme.colors.surfaceElevated,
+                    border = BorderStroke(1.dp, AppTheme.colors.border),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(modifier = Modifier.padding(12.dp)) {
                         Text(
                             text = "METABOLIC TARGET",
-                            color = Color(0xFF71717A),
+                            color = AppTheme.colors.textMuted,
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
                             letterSpacing = 1.sp
@@ -265,7 +270,7 @@ fun CustomFastDialog(
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
                             text = stagePreview,
-                            color = Color(0xFF34D399),
+                            color = AppTheme.colors.success,
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Medium
                         )
@@ -290,7 +295,7 @@ fun CustomFastDialog(
                         .height(52.dp),
                     shape = RoundedCornerShape(14.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF3B82F6),
+                        containerColor = AppTheme.colors.primary,
                         contentColor = Color.White
                     )
                 ) {

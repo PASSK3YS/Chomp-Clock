@@ -5,7 +5,6 @@ import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -23,6 +22,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
@@ -30,40 +30,86 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.BuildConfig
+import com.example.data.repository.HeightUnit
+import com.example.data.repository.ThemeMode
 import com.example.data.repository.UserPreferences
 import com.example.data.repository.WeightUnit
 import com.example.ui.components.AvatarPickerDialog
 import com.example.ui.components.UserAvatarView
+import com.example.ui.theme.AppTheme
+import com.example.ui.weight.WeightViewModel
+import com.example.util.CalorieWeightCalculator
+import com.example.util.WeightTrajectory
+import com.example.util.WeightUtils
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import java.util.*
+import kotlin.math.roundToInt
 
 @Composable
 fun SettingsScreen(
     userPrefs: UserPreferences?,
-    viewModel: SettingsViewModel = viewModel()
+    viewModel: SettingsViewModel = viewModel(),
+    weightViewModel: WeightViewModel = viewModel()
 ) {
     val context = LocalContext.current
+    val uriHandler = LocalUriHandler.current
     val scope = rememberCoroutineScope()
-    val updateCheckState by viewModel.updateCheckState.collectAsState()
-    val isBackingUp by viewModel.isBackingUp.collectAsState()
+    val scrollState = rememberScrollState()
 
-    val p = userPrefs ?: UserPreferences("User", 170f, "Male", WeightUnit.KG, false, true, true)
+    val p = userPrefs ?: UserPreferences(
+        username = "User",
+        heightCm = 170f,
+        gender = "Male",
+        weightUnit = WeightUnit.KG,
+        heightUnit = HeightUnit.CM,
+        useImperial = false,
+        themeMode = ThemeMode.DARK,
+        useDarkTheme = true,
+        soundsEnabled = true,
+        avatarId = "icon:🔥"
+    )
+
+    val weightEntries by weightViewModel.weightEntries.collectAsState()
+    val latestWeightKg = weightEntries.firstOrNull()?.weightKg ?: 70f
+
     var editName by remember(p.username) { mutableStateOf(p.username) }
-    var editHeight by remember(p.heightCm) { mutableStateOf(if (p.heightCm > 0) p.heightCm.toInt().toString() else "") }
-    var customCaloriesInput by remember(p.customDailyCalories) { mutableStateOf(p.customDailyCalories.toString()) }
+    var editHeightCm by remember(p.heightCm) { mutableStateOf(p.heightCm.toInt().toString()) }
+    
+    // Feet and inches state
+    val (initialFeet, initialInches) = WeightUtils.cmToFeetAndInches(p.heightCm)
+    var editFeet by remember(p.heightCm) { mutableStateOf(initialFeet.toString()) }
+    var editInches by remember(p.heightCm) { mutableStateOf(initialInches.toString()) }
+
+    // Waist state
+    var editWaist by remember(p.waistCm, p.heightUnit) {
+        val waistText = if (p.waistCm != null && p.waistCm > 0f) {
+            if (p.heightUnit == HeightUnit.FT_IN) {
+                String.format(Locale.getDefault(), "%.1f", p.waistCm / 2.54f)
+            } else {
+                String.format(Locale.getDefault(), "%.1f", p.waistCm)
+            }
+        } else {
+            ""
+        }
+        mutableStateOf(waistText)
+    }
+
+    var customCaloriesInput by remember(p.customDailyCalories) {
+        mutableStateOf(p.customDailyCalories.toString())
+    }
 
     var showAvatarPicker by remember { mutableStateOf(false) }
     var showDeleteConfirmDialog by remember { mutableStateOf(false) }
-    var showWhatsNewDialog by remember { mutableStateOf(false) }
-
-    // Export & Import State
-    var pendingExportPayload by remember { mutableStateOf<String?>(null) }
-    var pendingImportUri by remember { mutableStateOf<Uri?>(null) }
     var showImportConfirmDialog by remember { mutableStateOf(false) }
+    var pendingImportUri by remember { mutableStateOf<Uri?>(null) }
+    var pendingExportPayload by remember { mutableStateOf<String?>(null) }
     var backupResultSummary by remember { mutableStateOf<String?>(null) }
 
+    val isBackingUp by viewModel.isBackingUp.collectAsState()
+    val updateCheckState by viewModel.updateCheckState.collectAsState()
+
+    // File pickers for Backup/Restore
     val jsonExportLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("application/json")
     ) { uri ->
@@ -71,9 +117,9 @@ fun SettingsScreen(
             viewModel.exportToFileUri(uri, pendingExportPayload!!) { success ->
                 pendingExportPayload = null
                 if (success) {
-                    Toast.makeText(context, "JSON backup exported successfully!", Toast.LENGTH_LONG).show()
+                    Toast.makeText(context, "JSON Backup saved successfully!", Toast.LENGTH_LONG).show()
                 } else {
-                    Toast.makeText(context, "Export failed. Please try again.", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "Failed to save backup file.", Toast.LENGTH_SHORT).show()
                 }
             }
         }
@@ -86,16 +132,16 @@ fun SettingsScreen(
             viewModel.exportToFileUri(uri, pendingExportPayload!!) { success ->
                 pendingExportPayload = null
                 if (success) {
-                    Toast.makeText(context, "CSV spreadsheet exported successfully!", Toast.LENGTH_LONG).show()
+                    Toast.makeText(context, "CSV Export saved successfully!", Toast.LENGTH_LONG).show()
                 } else {
-                    Toast.makeText(context, "Export failed. Please try again.", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "Failed to save CSV file.", Toast.LENGTH_SHORT).show()
                 }
             }
         }
     }
 
     val jsonImportLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
+        contract = ActivityResultContracts.OpenDocument()
     ) { uri ->
         if (uri != null) {
             pendingImportUri = uri
@@ -103,12 +149,28 @@ fun SettingsScreen(
         }
     }
 
+    // Calculate weekly weight projection for live preview
+    val currentCalorieBudget = if (p.useCustomCalories && p.customDailyCalories > 0) p.customDailyCalories else {
+        weightViewModel.calculateDailyCalories(latestWeightKg, p.heightCm, 30, p.gender, p.waistCm)
+    }
+    val weeklyProjection = remember(currentCalorieBudget, latestWeightKg, p.heightCm, p.waistCm, p.gender, p.weightUnit) {
+        CalorieWeightCalculator.calculateWeeklyProjection(
+            dailyBudget = currentCalorieBudget,
+            weightKg = latestWeightKg,
+            heightCm = p.heightCm,
+            waistCm = p.waistCm,
+            age = 30,
+            gender = p.gender,
+            unit = p.weightUnit
+        )
+    }
+
     if (showAvatarPicker) {
         AvatarPickerDialog(
             currentAvatarId = p.avatarId,
             onDismiss = { showAvatarPicker = false },
-            onAvatarSelected = { newAvatarId ->
-                viewModel.updateAvatarId(newAvatarId)
+            onAvatarSelected = { newAvatar ->
+                viewModel.updateAvatarId(newAvatar)
             }
         )
     }
@@ -116,27 +178,17 @@ fun SettingsScreen(
     if (showDeleteConfirmDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteConfirmDialog = false },
-            icon = {
-                Icon(
-                    imageVector = Icons.Default.Warning,
-                    contentDescription = "Warning",
-                    tint = Color(0xFFEF4444),
-                    modifier = Modifier.size(36.dp)
-                )
-            },
             title = {
                 Text(
-                    text = "Delete All Device Data?",
+                    text = "Clear All Application Data?",
                     fontWeight = FontWeight.Bold,
-                    color = Color.White,
-                    fontSize = 18.sp
+                    color = AppTheme.colors.danger
                 )
             },
             text = {
                 Text(
-                    text = "This will permanently erase all your fasting history, food logs, weight records, and personalized settings from this device.\n\nThis action cannot be undone.",
-                    color = Color(0xFFA1A1AA),
-                    fontSize = 14.sp
+                    text = "This will permanently erase all your fasting history, food logs, weight entries, and preferences. You may export a JSON backup first.",
+                    color = AppTheme.colors.textSecondary
                 )
             },
             confirmButton = {
@@ -144,11 +196,11 @@ fun SettingsScreen(
                     onClick = {
                         viewModel.deleteDeviceData {
                             showDeleteConfirmDialog = false
-                            Toast.makeText(context, "All device data has been cleared.", Toast.LENGTH_LONG).show()
+                            Toast.makeText(context, "All device data has been cleared.", Toast.LENGTH_SHORT).show()
                         }
                     },
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFFDC2626),
+                        containerColor = AppTheme.colors.danger,
                         contentColor = Color.White
                     ),
                     shape = RoundedCornerShape(10.dp)
@@ -160,13 +212,14 @@ fun SettingsScreen(
                 OutlinedButton(
                     onClick = { showDeleteConfirmDialog = false },
                     shape = RoundedCornerShape(10.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
-                    border = BorderStroke(1.dp, Color(0xFF3F3F46))
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = AppTheme.colors.textPrimary),
+                    border = BorderStroke(1.dp, AppTheme.colors.border)
                 ) {
                     Text("Cancel")
                 }
             },
-            containerColor = Color(0xFF18181B)
+            containerColor = AppTheme.colors.surface,
+            shape = RoundedCornerShape(18.dp)
         )
     }
 
@@ -180,7 +233,7 @@ fun SettingsScreen(
                 Icon(
                     imageVector = Icons.Default.CloudUpload,
                     contentDescription = null,
-                    tint = Color(0xFF3B82F6),
+                    tint = AppTheme.colors.primary,
                     modifier = Modifier.size(36.dp)
                 )
             },
@@ -188,14 +241,14 @@ fun SettingsScreen(
                 Text(
                     text = "Import JSON Backup",
                     fontWeight = FontWeight.Bold,
-                    color = Color.White,
+                    color = AppTheme.colors.textPrimary,
                     fontSize = 18.sp
                 )
             },
             text = {
                 Text(
                     text = "How would you like to restore this backup file?\n\n• Merge: Adds all fasting sessions, food logs, and weights to your existing data.\n• Replace: Clears current logs and replaces them with the backup.",
-                    color = Color(0xFFA1A1AA),
+                    color = AppTheme.colors.textSecondary,
                     fontSize = 13.sp
                 )
             },
@@ -209,10 +262,10 @@ fun SettingsScreen(
                             backupResultSummary = result.message
                         }
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3B82F6)),
+                    colors = ButtonDefaults.buttonColors(containerColor = AppTheme.colors.primary),
                     shape = RoundedCornerShape(10.dp)
                 ) {
-                    Text("Merge Data", fontWeight = FontWeight.Bold)
+                    Text("Merge Data", fontWeight = FontWeight.Bold, color = Color.White)
                 }
             },
             dismissButton = {
@@ -227,7 +280,7 @@ fun SettingsScreen(
                             }
                         }
                     ) {
-                        Text("Replace Data", color = Color(0xFFEF4444), fontWeight = FontWeight.SemiBold)
+                        Text("Replace Data", color = AppTheme.colors.danger, fontWeight = FontWeight.SemiBold)
                     }
                     OutlinedButton(
                         onClick = {
@@ -235,74 +288,83 @@ fun SettingsScreen(
                             pendingImportUri = null
                         },
                         shape = RoundedCornerShape(10.dp),
-                        border = BorderStroke(1.dp, Color(0xFF3F3F46)),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
+                        border = BorderStroke(1.dp, AppTheme.colors.border),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = AppTheme.colors.textPrimary)
                     ) {
                         Text("Cancel")
                     }
                 }
             },
-            containerColor = Color(0xFF18181B)
+            containerColor = AppTheme.colors.surface,
+            shape = RoundedCornerShape(18.dp)
         )
     }
 
     if (backupResultSummary != null) {
         AlertDialog(
             onDismissRequest = { backupResultSummary = null },
-            icon = {
-                Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color(0xFF34D399), modifier = Modifier.size(36.dp))
-            },
-            title = {
-                Text("Backup Restore Status", fontWeight = FontWeight.Bold, color = Color.White)
-            },
-            text = {
-                Text(backupResultSummary ?: "", color = Color(0xFFA1A1AA), fontSize = 14.sp)
-            },
+            title = { Text("Backup Operation", color = AppTheme.colors.textPrimary, fontWeight = FontWeight.Bold) },
+            text = { Text(backupResultSummary ?: "", color = AppTheme.colors.textSecondary, fontSize = 14.sp) },
             confirmButton = {
                 Button(
                     onClick = { backupResultSummary = null },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3B82F6)),
-                    shape = RoundedCornerShape(10.dp)
+                    colors = ButtonDefaults.buttonColors(containerColor = AppTheme.colors.primary)
                 ) {
-                    Text("Done", fontWeight = FontWeight.Bold)
+                    Text("OK", color = Color.White, fontWeight = FontWeight.Bold)
                 }
             },
-            containerColor = Color(0xFF18181B)
+            containerColor = AppTheme.colors.surface,
+            shape = RoundedCornerShape(18.dp)
         )
     }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 24.dp, vertical = 20.dp)
+            .verticalScroll(scrollState)
+            .padding(horizontal = 24.dp, vertical = 16.dp)
     ) {
-        Text(
-            text = "Settings",
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
-            color = Color.White
-        )
-        Text(
-            text = "Manage profile, measurement units & updates",
-            style = MaterialTheme.typography.bodyMedium,
-            color = Color(0xFF71717A)
-        )
+        // Top Header
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Settings",
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold,
+                color = AppTheme.colors.textPrimary
+            )
+            Surface(
+                shape = RoundedCornerShape(8.dp),
+                color = AppTheme.colors.primary.copy(alpha = if (AppTheme.colors.isDark) 0.15f else 0.10f),
+                border = BorderStroke(1.dp, AppTheme.colors.primary.copy(alpha = 0.4f))
+            ) {
+                Text(
+                    text = "v${BuildConfig.VERSION_NAME.ifEmpty { "1.1.3" }}",
+                    color = AppTheme.colors.primaryVariant,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                )
+            }
+        }
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // 1. PROFILE & AVATAR SECTION
+        // 1. PROFILE & AVATAR
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(18.dp),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF18181B)),
-            border = BorderStroke(1.dp, Color(0xFF27272A))
+            colors = CardDefaults.cardColors(containerColor = AppTheme.colors.surface),
+            border = BorderStroke(1.dp, AppTheme.colors.border)
         ) {
             Column(modifier = Modifier.padding(18.dp)) {
                 Text(
                     text = "PROFILE & AVATAR",
                     style = MaterialTheme.typography.labelSmall,
-                    color = Color(0xFF71717A),
+                    color = AppTheme.colors.textMuted,
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 1.sp
                 )
@@ -322,8 +384,8 @@ fun SettingsScreen(
                         Surface(
                             onClick = { showAvatarPicker = true },
                             shape = CircleShape,
-                            color = Color(0xFF3B82F6),
-                            border = BorderStroke(2.dp, Color(0xFF18181B)),
+                            color = AppTheme.colors.primary,
+                            border = BorderStroke(2.dp, AppTheme.colors.surface),
                             modifier = Modifier
                                 .size(24.dp)
                                 .align(Alignment.BottomEnd)
@@ -346,18 +408,19 @@ fun SettingsScreen(
                             text = p.username.ifEmpty { "User" },
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
-                            color = Color.White
+                            color = AppTheme.colors.textPrimary
                         )
+                        val formattedH = WeightUtils.formatHeight(p.heightCm, p.heightUnit)
                         Text(
-                            text = "${p.gender} • ${p.heightCm.toInt()} cm",
+                            text = "${p.gender} • $formattedH${if (p.waistCm != null && p.waistCm > 0f) " • Waist: ${WeightUtils.formatWaist(p.waistCm, p.heightUnit == HeightUnit.FT_IN)}" else ""}",
                             style = MaterialTheme.typography.bodySmall,
-                            color = Color(0xFFA1A1AA)
+                            color = AppTheme.colors.textSecondary
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = "Tap avatar to change icon or photo",
                             style = MaterialTheme.typography.labelSmall,
-                            color = Color(0xFF60A5FA),
+                            color = AppTheme.colors.primaryVariant,
                             modifier = Modifier.clickable { showAvatarPicker = true }
                         )
                     }
@@ -375,35 +438,176 @@ fun SettingsScreen(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Color(0xFF3B82F6),
-                        unfocusedBorderColor = Color(0xFF27272A),
-                        focusedContainerColor = Color(0xFF27272A),
-                        unfocusedContainerColor = Color(0xFF27272A)
+                        focusedBorderColor = AppTheme.colors.primary,
+                        unfocusedBorderColor = AppTheme.colors.border,
+                        focusedTextColor = AppTheme.colors.textPrimary,
+                        unfocusedTextColor = AppTheme.colors.textPrimary,
+                        focusedContainerColor = AppTheme.colors.inputBackground,
+                        unfocusedContainerColor = AppTheme.colors.inputBackground
                     )
                 )
 
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Height Section with Unit Switcher (cm vs ft/in)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Height",
+                        color = AppTheme.colors.textSecondary,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        modifier = Modifier
+                            .background(AppTheme.colors.surfaceElevated, RoundedCornerShape(8.dp))
+                            .padding(2.dp)
+                    ) {
+                        HeightUnit.values().forEach { hUnit ->
+                            val isSelected = p.heightUnit == hUnit
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = if (isSelected) AppTheme.colors.primary else Color.Transparent,
+                                modifier = Modifier
+                                    .clickable { viewModel.updateHeightUnit(hUnit) }
+                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                            ) {
+                                Text(
+                                    text = if (hUnit == HeightUnit.CM) "cm" else "ft & in",
+                                    color = if (isSelected) Color.White else AppTheme.colors.textSecondary,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                if (p.heightUnit == HeightUnit.CM) {
+                    OutlinedTextField(
+                        value = editHeightCm,
+                        onValueChange = { input ->
+                            if (input.all { c -> c.isDigit() } && input.length <= 3) {
+                                editHeightCm = input
+                                input.toFloatOrNull()?.let { h ->
+                                    if (h > 0f) viewModel.updateHeight(h)
+                                }
+                            }
+                        },
+                        label = { Text("Height in Centimeters (cm)") },
+                        placeholder = { Text("e.g. 175") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = AppTheme.colors.primary,
+                            unfocusedBorderColor = AppTheme.colors.border,
+                            focusedTextColor = AppTheme.colors.textPrimary,
+                            unfocusedTextColor = AppTheme.colors.textPrimary,
+                            focusedContainerColor = AppTheme.colors.inputBackground,
+                            unfocusedContainerColor = AppTheme.colors.inputBackground
+                        )
+                    )
+                } else {
+                    // Feet & Inches inputs side by side
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = editFeet,
+                            onValueChange = { fInput ->
+                                if (fInput.all { c -> c.isDigit() } && fInput.length <= 2) {
+                                    editFeet = fInput
+                                    val feetVal = fInput.toIntOrNull() ?: 0
+                                    val inchesVal = editInches.toIntOrNull() ?: 0
+                                    if (feetVal > 0 || inchesVal > 0) {
+                                        val totalCm = WeightUtils.feetAndInchesToCm(feetVal, inchesVal)
+                                        viewModel.updateHeight(totalCm)
+                                    }
+                                }
+                            },
+                            label = { Text("Feet (ft)") },
+                            placeholder = { Text("5") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            modifier = Modifier.weight(1f),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = AppTheme.colors.primary,
+                                unfocusedBorderColor = AppTheme.colors.border,
+                                focusedTextColor = AppTheme.colors.textPrimary,
+                                unfocusedTextColor = AppTheme.colors.textPrimary,
+                                focusedContainerColor = AppTheme.colors.inputBackground,
+                                unfocusedContainerColor = AppTheme.colors.inputBackground
+                            )
+                        )
+
+                        OutlinedTextField(
+                            value = editInches,
+                            onValueChange = { inInput ->
+                                if (inInput.all { c -> c.isDigit() } && inInput.length <= 2) {
+                                    val inNum = inInput.toIntOrNull() ?: 0
+                                    if (inNum < 12) {
+                                        editInches = inInput
+                                        val feetVal = editFeet.toIntOrNull() ?: 0
+                                        val totalCm = WeightUtils.feetAndInchesToCm(feetVal, inNum)
+                                        viewModel.updateHeight(totalCm)
+                                    }
+                                }
+                            },
+                            label = { Text("Inches (in)") },
+                            placeholder = { Text("10") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            modifier = Modifier.weight(1f),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = AppTheme.colors.primary,
+                                unfocusedBorderColor = AppTheme.colors.border,
+                                focusedTextColor = AppTheme.colors.textPrimary,
+                                unfocusedTextColor = AppTheme.colors.textPrimary,
+                                focusedContainerColor = AppTheme.colors.inputBackground,
+                                unfocusedContainerColor = AppTheme.colors.inputBackground
+                            )
+                        )
+                    }
+                }
+
                 Spacer(modifier = Modifier.height(10.dp))
 
+                // Waist Circumference & Gender
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     OutlinedTextField(
-                        value = editHeight,
-                        onValueChange = {
-                            if (it.all { c -> c.isDigit() } && it.length <= 3) {
-                                editHeight = it
-                                it.toFloatOrNull()?.let { h -> viewModel.updateHeight(h) }
+                        value = editWaist,
+                        onValueChange = { wInput ->
+                            if (wInput.count { it == '.' } <= 1 && wInput.all { it.isDigit() || it == '.' } && wInput.length <= 5) {
+                                editWaist = wInput
+                                val num = wInput.toFloatOrNull()
+                                if (num != null && num > 0f) {
+                                    val cm = if (p.heightUnit == HeightUnit.FT_IN) num * 2.54f else num
+                                    viewModel.updateWaist(cm)
+                                } else if (wInput.isEmpty()) {
+                                    viewModel.updateWaist(null)
+                                }
                             }
                         },
-                        label = { Text("Height (cm)") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        label = { Text(if (p.heightUnit == HeightUnit.FT_IN) "Waist (inches)" else "Waist (cm)") },
+                        placeholder = { Text("Optional") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         modifier = Modifier.weight(1f),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Color(0xFF3B82F6),
-                            unfocusedBorderColor = Color(0xFF27272A),
-                            focusedContainerColor = Color(0xFF27272A),
-                            unfocusedContainerColor = Color(0xFF27272A)
+                            focusedBorderColor = AppTheme.colors.primary,
+                            unfocusedBorderColor = AppTheme.colors.border,
+                            focusedTextColor = AppTheme.colors.textPrimary,
+                            unfocusedTextColor = AppTheme.colors.textPrimary,
+                            focusedContainerColor = AppTheme.colors.inputBackground,
+                            unfocusedContainerColor = AppTheme.colors.inputBackground
                         )
                     )
 
@@ -411,7 +615,7 @@ fun SettingsScreen(
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             "Gender",
-                            color = Color(0xFF71717A),
+                            color = AppTheme.colors.textMuted,
                             fontSize = 11.sp,
                             modifier = Modifier.padding(bottom = 4.dp)
                         )
@@ -423,8 +627,8 @@ fun SettingsScreen(
                                 val isSelected = p.gender.equals(g, ignoreCase = true)
                                 Surface(
                                     shape = RoundedCornerShape(8.dp),
-                                    color = if (isSelected) Color(0xFF3B82F6).copy(alpha = 0.25f) else Color(0xFF27272A),
-                                    border = BorderStroke(1.dp, if (isSelected) Color(0xFF3B82F6) else Color(0xFF3F3F46)),
+                                    color = if (isSelected) AppTheme.colors.primary.copy(alpha = if (AppTheme.colors.isDark) 0.25f else 0.15f) else AppTheme.colors.inputBackground,
+                                    border = BorderStroke(1.dp, if (isSelected) AppTheme.colors.primary else AppTheme.colors.border),
                                     modifier = Modifier
                                         .weight(1f)
                                         .height(52.dp)
@@ -433,7 +637,7 @@ fun SettingsScreen(
                                     Box(contentAlignment = Alignment.Center) {
                                         Text(
                                             text = g,
-                                            color = if (isSelected) Color(0xFF60A5FA) else Color.White,
+                                            color = if (isSelected) AppTheme.colors.primary else AppTheme.colors.textPrimary,
                                             fontSize = 13.sp,
                                             fontWeight = FontWeight.SemiBold
                                         )
@@ -448,25 +652,107 @@ fun SettingsScreen(
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // 2. MEASUREMENT & WEIGHT UNITS (Stone & Pounds, Pounds, KG)
+        // 2. THEME & DISPLAY APPEARANCE (Light, Dark, System)
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(18.dp),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF18181B)),
-            border = BorderStroke(1.dp, Color(0xFF27272A))
+            colors = CardDefaults.cardColors(containerColor = AppTheme.colors.surface),
+            border = BorderStroke(1.dp, AppTheme.colors.border)
+        ) {
+            Column(modifier = Modifier.padding(18.dp)) {
+                Text(
+                    text = "THEME & APPEARANCE",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = AppTheme.colors.textMuted,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.sp
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = "Choose your preferred interface theme style:",
+                    color = AppTheme.colors.textSecondary,
+                    fontSize = 13.sp
+                )
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    val themeOptions = listOf(
+                        Triple(ThemeMode.DARK, "🌙 Dark Mode", "AMOLED deep black with high contrast vibrant neon accents"),
+                        Triple(ThemeMode.LIGHT, "☀️ Light Mode", "Clean, bright slate interface with ultra-readable dark text"),
+                        Triple(ThemeMode.SYSTEM, "📱 System Default", "Automatically match your Android device system setting")
+                    )
+
+                    themeOptions.forEach { (mode, title, desc) ->
+                        val isSelected = p.themeMode == mode
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = if (isSelected) AppTheme.colors.primary.copy(alpha = if (AppTheme.colors.isDark) 0.20f else 0.12f) else AppTheme.colors.surfaceElevated,
+                            border = BorderStroke(
+                                1.5.dp,
+                                if (isSelected) AppTheme.colors.primary else AppTheme.colors.border
+                            ),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { viewModel.updateThemeMode(mode) }
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(14.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = title,
+                                        color = if (isSelected) AppTheme.colors.primary else AppTheme.colors.textPrimary,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 14.sp
+                                    )
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = desc,
+                                        color = AppTheme.colors.textSecondary,
+                                        fontSize = 12.sp
+                                    )
+                                }
+                                RadioButton(
+                                    selected = isSelected,
+                                    onClick = { viewModel.updateThemeMode(mode) },
+                                    colors = RadioButtonDefaults.colors(
+                                        selectedColor = AppTheme.colors.primary,
+                                        unselectedColor = AppTheme.colors.textMuted
+                                    )
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        // 3. MEASUREMENT & WEIGHT UNITS (Stone & Pounds, Pounds, KG)
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(18.dp),
+            colors = CardDefaults.cardColors(containerColor = AppTheme.colors.surface),
+            border = BorderStroke(1.dp, AppTheme.colors.border)
         ) {
             Column(modifier = Modifier.padding(18.dp)) {
                 Text(
                     text = "MEASUREMENT & UNITS",
                     style = MaterialTheme.typography.labelSmall,
-                    color = Color(0xFF71717A),
+                    color = AppTheme.colors.textMuted,
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 1.sp
                 )
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
                     text = "Select preferred weight unit system:",
-                    color = Color(0xFFA1A1AA),
+                    color = AppTheme.colors.textSecondary,
                     fontSize = 13.sp
                 )
 
@@ -483,10 +769,10 @@ fun SettingsScreen(
                         val isSelected = p.weightUnit == unit
                         Surface(
                             shape = RoundedCornerShape(12.dp),
-                            color = if (isSelected) Color(0xFF3B82F6).copy(alpha = 0.18f) else Color(0xFF27272A),
+                            color = if (isSelected) AppTheme.colors.primary.copy(alpha = if (AppTheme.colors.isDark) 0.18f else 0.12f) else AppTheme.colors.surfaceElevated,
                             border = BorderStroke(
                                 1.5.dp,
-                                if (isSelected) Color(0xFF3B82F6) else Color(0xFF3F3F46).copy(alpha = 0.5f)
+                                if (isSelected) AppTheme.colors.primary else AppTheme.colors.border
                             ),
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -505,13 +791,13 @@ fun SettingsScreen(
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
                                         text = title,
-                                        color = if (isSelected) Color(0xFF60A5FA) else Color.White,
+                                        color = if (isSelected) AppTheme.colors.primary else AppTheme.colors.textPrimary,
                                         fontWeight = FontWeight.SemiBold,
                                         fontSize = 14.sp
                                     )
                                     Text(
                                         text = subtitle,
-                                        color = Color(0xFF71717A),
+                                        color = AppTheme.colors.textMuted,
                                         fontSize = 12.sp
                                     )
                                 }
@@ -522,8 +808,8 @@ fun SettingsScreen(
                                         viewModel.updateUseImperial(unit != WeightUnit.KG)
                                     },
                                     colors = RadioButtonDefaults.colors(
-                                        selectedColor = Color(0xFF3B82F6),
-                                        unselectedColor = Color(0xFF71717A)
+                                        selectedColor = AppTheme.colors.primary,
+                                        unselectedColor = AppTheme.colors.textMuted
                                     )
                                 )
                             }
@@ -535,25 +821,25 @@ fun SettingsScreen(
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // 3. DAILY CALORIE INTAKE & BUDGET
+        // 4. DAILY CALORIE INTAKE & WEEKLY WEIGHT LOSS PROJECTION
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(18.dp),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF18181B)),
-            border = BorderStroke(1.dp, Color(0xFF27272A))
+            colors = CardDefaults.cardColors(containerColor = AppTheme.colors.surface),
+            border = BorderStroke(1.dp, AppTheme.colors.border)
         ) {
             Column(modifier = Modifier.padding(18.dp)) {
                 Text(
-                    text = "DAILY CALORIE BUDGET",
+                    text = "DAILY CALORIE BUDGET & WEIGHT PROJECTION",
                     style = MaterialTheme.typography.labelSmall,
-                    color = Color(0xFF71717A),
+                    color = AppTheme.colors.textMuted,
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 1.sp
                 )
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
                     text = "Configure how your daily calorie goal is determined:",
-                    color = Color(0xFFA1A1AA),
+                    color = AppTheme.colors.textSecondary,
                     fontSize = 13.sp
                 )
 
@@ -562,10 +848,10 @@ fun SettingsScreen(
                 // Option 1: Automatic BMR/TDEE
                 Surface(
                     shape = RoundedCornerShape(12.dp),
-                    color = if (!p.useCustomCalories) Color(0xFF3B82F6).copy(alpha = 0.18f) else Color(0xFF27272A),
+                    color = if (!p.useCustomCalories) AppTheme.colors.primary.copy(alpha = if (AppTheme.colors.isDark) 0.18f else 0.12f) else AppTheme.colors.surfaceElevated,
                     border = BorderStroke(
                         1.5.dp,
-                        if (!p.useCustomCalories) Color(0xFF3B82F6) else Color(0xFF3F3F46).copy(alpha = 0.5f)
+                        if (!p.useCustomCalories) AppTheme.colors.primary else AppTheme.colors.border
                     ),
                     modifier = Modifier
                         .fillMaxWidth()
@@ -581,13 +867,13 @@ fun SettingsScreen(
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = "Auto-Calculate (BMR / TDEE)",
-                                color = if (!p.useCustomCalories) Color(0xFF60A5FA) else Color.White,
+                                color = if (!p.useCustomCalories) AppTheme.colors.primary else AppTheme.colors.textPrimary,
                                 fontWeight = FontWeight.SemiBold,
                                 fontSize = 14.sp
                             )
                             Text(
-                                text = "Uses Mifflin-St Jeor formula based on weight, height, and gender",
-                                color = Color(0xFF71717A),
+                                text = "Uses Mifflin-St Jeor formula based on weight (${WeightUtils.formatWeight(latestWeightKg, p.weightUnit)}), height (${WeightUtils.formatHeight(p.heightCm, p.heightUnit)}), gender, and waist",
+                                color = AppTheme.colors.textMuted,
                                 fontSize = 12.sp
                             )
                         }
@@ -595,8 +881,8 @@ fun SettingsScreen(
                             selected = !p.useCustomCalories,
                             onClick = { viewModel.updateUseCustomCalories(false) },
                             colors = RadioButtonDefaults.colors(
-                                selectedColor = Color(0xFF3B82F6),
-                                unselectedColor = Color(0xFF71717A)
+                                selectedColor = AppTheme.colors.primary,
+                                unselectedColor = AppTheme.colors.textMuted
                             )
                         )
                     }
@@ -607,10 +893,10 @@ fun SettingsScreen(
                 // Option 2: Custom Daily Calories
                 Surface(
                     shape = RoundedCornerShape(12.dp),
-                    color = if (p.useCustomCalories) Color(0xFF3B82F6).copy(alpha = 0.18f) else Color(0xFF27272A),
+                    color = if (p.useCustomCalories) AppTheme.colors.primary.copy(alpha = if (AppTheme.colors.isDark) 0.18f else 0.12f) else AppTheme.colors.surfaceElevated,
                     border = BorderStroke(
                         1.5.dp,
-                        if (p.useCustomCalories) Color(0xFF3B82F6) else Color(0xFF3F3F46).copy(alpha = 0.5f)
+                        if (p.useCustomCalories) AppTheme.colors.primary else AppTheme.colors.border
                     ),
                     modifier = Modifier
                         .fillMaxWidth()
@@ -625,13 +911,13 @@ fun SettingsScreen(
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
                                     text = "Custom Daily Calorie Target",
-                                    color = if (p.useCustomCalories) Color(0xFF60A5FA) else Color.White,
+                                    color = if (p.useCustomCalories) AppTheme.colors.primary else AppTheme.colors.textPrimary,
                                     fontWeight = FontWeight.SemiBold,
                                     fontSize = 14.sp
                                 )
                                 Text(
                                     text = "Set your own fixed target (e.g. 1500 - 3000 kcal/day)",
-                                    color = Color(0xFF71717A),
+                                    color = AppTheme.colors.textMuted,
                                     fontSize = 12.sp
                                 )
                             }
@@ -639,8 +925,8 @@ fun SettingsScreen(
                                 selected = p.useCustomCalories,
                                 onClick = { viewModel.updateUseCustomCalories(true) },
                                 colors = RadioButtonDefaults.colors(
-                                    selectedColor = Color(0xFF3B82F6),
-                                    unselectedColor = Color(0xFF71717A)
+                                    selectedColor = AppTheme.colors.primary,
+                                    unselectedColor = AppTheme.colors.textMuted
                                 )
                             )
                         }
@@ -663,28 +949,30 @@ fun SettingsScreen(
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                 modifier = Modifier.fillMaxWidth(),
                                 colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = Color(0xFF3B82F6),
-                                    unfocusedBorderColor = Color(0xFF3F3F46),
-                                    focusedContainerColor = Color(0xFF27272A),
-                                    unfocusedContainerColor = Color(0xFF27272A)
+                                    focusedBorderColor = AppTheme.colors.primary,
+                                    unfocusedBorderColor = AppTheme.colors.border,
+                                    focusedTextColor = AppTheme.colors.textPrimary,
+                                    unfocusedTextColor = AppTheme.colors.textPrimary,
+                                    focusedContainerColor = AppTheme.colors.inputBackground,
+                                    unfocusedContainerColor = AppTheme.colors.inputBackground
                                 )
                             )
 
                             Spacer(modifier = Modifier.height(10.dp))
 
-                            Text("Quick Targets:", color = Color(0xFF71717A), fontSize = 11.sp, fontWeight = FontWeight.Medium)
+                            Text("Quick Targets:", color = AppTheme.colors.textMuted, fontSize = 11.sp, fontWeight = FontWeight.Medium)
                             Spacer(modifier = Modifier.height(6.dp))
 
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
-                                listOf(1500, 1800, 2000, 2200, 2500).forEach { preset ->
+                                listOf(1400, 1600, 1800, 2000, 2200).forEach { preset ->
                                     val isCurrent = p.customDailyCalories == preset
                                     Surface(
                                         shape = RoundedCornerShape(8.dp),
-                                        color = if (isCurrent) Color(0xFF3B82F6) else Color(0xFF27272A),
-                                        border = BorderStroke(1.dp, if (isCurrent) Color(0xFF60A5FA) else Color(0xFF3F3F46)),
+                                        color = if (isCurrent) AppTheme.colors.primary else AppTheme.colors.inputBackground,
+                                        border = BorderStroke(1.dp, if (isCurrent) AppTheme.colors.primary else AppTheme.colors.border),
                                         modifier = Modifier
                                             .weight(1f)
                                             .clickable {
@@ -698,7 +986,7 @@ fun SettingsScreen(
                                         ) {
                                             Text(
                                                 text = "$preset",
-                                                color = if (isCurrent) Color.White else Color(0xFFA1A1AA),
+                                                color = if (isCurrent) Color.White else AppTheme.colors.textSecondary,
                                                 fontSize = 11.sp,
                                                 fontWeight = FontWeight.Bold
                                             )
@@ -709,23 +997,79 @@ fun SettingsScreen(
                         }
                     }
                 }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Live Weekly Weight Loss Telemetry Card
+                val bannerColor = when (weeklyProjection.trajectory) {
+                    WeightTrajectory.WEIGHT_LOSS -> AppTheme.colors.success
+                    WeightTrajectory.WEIGHT_GAIN -> AppTheme.colors.warning
+                    WeightTrajectory.MAINTENANCE -> AppTheme.colors.primary
+                }
+
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = bannerColor.copy(alpha = if (AppTheme.colors.isDark) 0.15f else 0.10f),
+                    border = BorderStroke(1.dp, bannerColor.copy(alpha = 0.4f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = if (weeklyProjection.trajectory == WeightTrajectory.WEIGHT_LOSS) Icons.Default.TrendingDown else Icons.Default.TrendingUp,
+                                    contentDescription = null,
+                                    tint = bannerColor,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "PROJECTED WEEKLY CHANGE",
+                                    color = bannerColor,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 11.sp,
+                                    letterSpacing = 0.8.sp
+                                )
+                            }
+                            Text(
+                                text = weeklyProjection.summaryText,
+                                color = bannerColor,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        Text(
+                            text = weeklyProjection.explanationText,
+                            color = AppTheme.colors.textSecondary,
+                            fontSize = 12.sp,
+                            lineHeight = 16.sp
+                        )
+                    }
+                }
             }
         }
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // 4. APP PREFERENCES
+        // 5. AUDIBLE ALERTS & PREFERENCES
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(18.dp),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF18181B)),
-            border = BorderStroke(1.dp, Color(0xFF27272A))
+            colors = CardDefaults.cardColors(containerColor = AppTheme.colors.surface),
+            border = BorderStroke(1.dp, AppTheme.colors.border)
         ) {
             Column(modifier = Modifier.padding(18.dp)) {
                 Text(
-                    text = "PREFERENCES & ALERTS",
+                    text = "ALERTS & NOTIFICATIONS",
                     style = MaterialTheme.typography.labelSmall,
-                    color = Color(0xFF71717A),
+                    color = AppTheme.colors.textMuted,
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 1.sp
                 )
@@ -737,37 +1081,16 @@ fun SettingsScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column {
-                        Text("Dark Theme (Sophisticated Dark)", color = Color.White, fontWeight = FontWeight.Medium)
-                        Text("High contrast AMOLED dark styling", color = Color(0xFF71717A), fontSize = 12.sp)
-                    }
-                    Switch(
-                        checked = p.useDarkTheme,
-                        onCheckedChange = { viewModel.updateUseDarkTheme(it) },
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = Color.White,
-                            checkedTrackColor = Color(0xFF3B82F6)
-                        )
-                    )
-                }
-
-                HorizontalDivider(color = Color(0xFF27272A), modifier = Modifier.padding(vertical = 10.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text("Audible Fasting Alerts", color = Color.White, fontWeight = FontWeight.Medium)
-                        Text("Sound chime upon goal completion", color = Color(0xFF71717A), fontSize = 12.sp)
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Audible Fasting Alerts", color = AppTheme.colors.textPrimary, fontWeight = FontWeight.Medium)
+                        Text("Sound chime upon goal completion", color = AppTheme.colors.textMuted, fontSize = 12.sp)
                     }
                     Switch(
                         checked = p.soundsEnabled,
                         onCheckedChange = { viewModel.updateSoundsEnabled(it) },
                         colors = SwitchDefaults.colors(
                             checkedThumbColor = Color.White,
-                            checkedTrackColor = Color(0xFF3B82F6)
+                            checkedTrackColor = AppTheme.colors.primary
                         )
                     )
                 }
@@ -776,12 +1099,12 @@ fun SettingsScreen(
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // 5. DATA BACKUP, EXPORT & IMPORT (.JSON / .CSV)
+        // 6. DATA BACKUP, EXPORT & IMPORT (.JSON / .CSV)
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(18.dp),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF18181B)),
-            border = BorderStroke(1.dp, Color(0xFF27272A))
+            colors = CardDefaults.cardColors(containerColor = AppTheme.colors.surface),
+            border = BorderStroke(1.dp, AppTheme.colors.border)
         ) {
             Column(modifier = Modifier.padding(18.dp)) {
                 Row(
@@ -792,18 +1115,18 @@ fun SettingsScreen(
                     Text(
                         text = "DATA BACKUP & EXPORT",
                         style = MaterialTheme.typography.labelSmall,
-                        color = Color(0xFF71717A),
+                        color = AppTheme.colors.textMuted,
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 1.sp
                     )
                     Surface(
                         shape = RoundedCornerShape(50),
-                        color = Color(0xFF1E293B),
-                        border = BorderStroke(1.dp, Color(0xFF334155))
+                        color = AppTheme.colors.primary.copy(alpha = 0.15f),
+                        border = BorderStroke(1.dp, AppTheme.colors.primary.copy(alpha = 0.3f))
                     ) {
                         Text(
                             text = ".JSON / .CSV",
-                            color = Color(0xFF60A5FA),
+                            color = AppTheme.colors.primary,
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
@@ -815,7 +1138,7 @@ fun SettingsScreen(
 
                 Text(
                     text = "Safely backup, transfer, or export your fasting sessions, food logs, and weight telemetry.",
-                    color = Color(0xFFA1A1AA),
+                    color = AppTheme.colors.textSecondary,
                     fontSize = 12.sp
                 )
 
@@ -824,8 +1147,8 @@ fun SettingsScreen(
                 // Action 1: Export .JSON
                 Surface(
                     shape = RoundedCornerShape(12.dp),
-                    color = Color(0xFF27272A),
-                    border = BorderStroke(1.dp, Color(0xFF3F3F46)),
+                    color = AppTheme.colors.surfaceElevated,
+                    border = BorderStroke(1.dp, AppTheme.colors.border),
                     modifier = Modifier
                         .fillMaxWidth()
                         .clickable(enabled = !isBackingUp) {
@@ -845,29 +1168,66 @@ fun SettingsScreen(
                     ) {
                         Surface(
                             shape = RoundedCornerShape(8.dp),
-                            color = Color(0xFF3B82F6).copy(alpha = 0.2f),
+                            color = AppTheme.colors.primary.copy(alpha = 0.2f),
                             modifier = Modifier.size(36.dp)
                         ) {
                             Box(contentAlignment = Alignment.Center) {
-                                Icon(Icons.Default.DataObject, contentDescription = null, tint = Color(0xFF60A5FA), modifier = Modifier.size(20.dp))
+                                Icon(Icons.Default.CloudDownload, contentDescription = null, tint = AppTheme.colors.primary, modifier = Modifier.size(20.dp))
                             }
                         }
                         Spacer(modifier = Modifier.width(12.dp))
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("Export as .JSON Backup", color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
-                            Text("Complete archive of fasting, foods & settings", color = Color(0xFF71717A), fontSize = 11.sp)
+                            Text("Export Full JSON Backup", color = AppTheme.colors.textPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                            Text("Complete snapshot for migration and restore", color = AppTheme.colors.textMuted, fontSize = 12.sp)
                         }
-                        Icon(Icons.Default.FileDownload, contentDescription = null, tint = Color(0xFF60A5FA), modifier = Modifier.size(18.dp))
+                        Icon(Icons.Default.ChevronRight, contentDescription = null, tint = AppTheme.colors.textMuted)
                     }
                 }
 
                 Spacer(modifier = Modifier.height(10.dp))
 
-                // Action 2: Export .CSV
+                // Action 2: Import .JSON
                 Surface(
                     shape = RoundedCornerShape(12.dp),
-                    color = Color(0xFF27272A),
-                    border = BorderStroke(1.dp, Color(0xFF3F3F46)),
+                    color = AppTheme.colors.surfaceElevated,
+                    border = BorderStroke(1.dp, AppTheme.colors.border),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(enabled = !isBackingUp) {
+                            jsonImportLauncher.launch(arrayOf("application/json", "text/*", "*/*"))
+                        }
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = AppTheme.colors.success.copy(alpha = 0.2f),
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(Icons.Default.CloudUpload, contentDescription = null, tint = AppTheme.colors.success, modifier = Modifier.size(20.dp))
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Import & Restore JSON Backup", color = AppTheme.colors.textPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                            Text("Merge or replace existing sessions and data", color = AppTheme.colors.textMuted, fontSize = 12.sp)
+                        }
+                        Icon(Icons.Default.ChevronRight, contentDescription = null, tint = AppTheme.colors.textMuted)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Action 3: Export .CSV
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = AppTheme.colors.surfaceElevated,
+                    border = BorderStroke(1.dp, AppTheme.colors.border),
                     modifier = Modifier
                         .fillMaxWidth()
                         .clickable(enabled = !isBackingUp) {
@@ -875,7 +1235,7 @@ fun SettingsScreen(
                                 val csv = viewModel.getCsvExportData()
                                 pendingExportPayload = csv
                                 val timeStamp = SimpleDateFormat("yyyyMMdd_HHmm", Locale.getDefault()).format(Date())
-                                csvExportLauncher.launch("chomp_clock_spreadsheet_$timeStamp.csv")
+                                csvExportLauncher.launch("chomp_clock_export_$timeStamp.csv")
                             }
                         }
                 ) {
@@ -887,96 +1247,41 @@ fun SettingsScreen(
                     ) {
                         Surface(
                             shape = RoundedCornerShape(8.dp),
-                            color = Color(0xFF10B981).copy(alpha = 0.2f),
+                            color = AppTheme.colors.warning.copy(alpha = 0.2f),
                             modifier = Modifier.size(36.dp)
                         ) {
                             Box(contentAlignment = Alignment.Center) {
-                                Icon(Icons.Default.TableChart, contentDescription = null, tint = Color(0xFF34D399), modifier = Modifier.size(20.dp))
+                                Icon(Icons.Default.Description, contentDescription = null, tint = AppTheme.colors.warning, modifier = Modifier.size(20.dp))
                             }
                         }
                         Spacer(modifier = Modifier.width(12.dp))
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("Export as .CSV Spreadsheet", color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
-                            Text("Compatible with Excel, Google Sheets, & Numbers", color = Color(0xFF71717A), fontSize = 11.sp)
+                            Text("Export CSV Spreadsheet", color = AppTheme.colors.textPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                            Text("Compatible with Excel, Google Sheets & Apple Numbers", color = AppTheme.colors.textMuted, fontSize = 12.sp)
                         }
-                        Icon(Icons.Default.FileDownload, contentDescription = null, tint = Color(0xFF34D399), modifier = Modifier.size(18.dp))
+                        Icon(Icons.Default.ChevronRight, contentDescription = null, tint = AppTheme.colors.textMuted)
                     }
                 }
 
-                Spacer(modifier = Modifier.height(10.dp))
-
-                // Action 3: Import .JSON
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = Color(0xFF27272A),
-                    border = BorderStroke(1.dp, Color(0xFF3F3F46)),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable(enabled = !isBackingUp) {
-                            jsonImportLauncher.launch("application/json")
-                        }
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(14.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = Color(0xFFA855F7).copy(alpha = 0.2f),
-                            modifier = Modifier.size(36.dp)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(Icons.Default.CloudUpload, contentDescription = null, tint = Color(0xFFC084FC), modifier = Modifier.size(20.dp))
-                            }
-                        }
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text("Import via .JSON Backup", color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
-                            Text("Restore previous fasts, food logs & weights", color = Color(0xFF71717A), fontSize = 11.sp)
-                        }
-                        Icon(Icons.Default.FileUpload, contentDescription = null, tint = Color(0xFFC084FC), modifier = Modifier.size(18.dp))
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                // Action 4: Quick Share
-                OutlinedButton(
-                    onClick = {
-                        scope.launch {
-                            val json = viewModel.getJsonExportData()
-                            val sendIntent: Intent = Intent().apply {
-                                action = Intent.ACTION_SEND
-                                putExtra(Intent.EXTRA_TEXT, json)
-                                type = "text/plain"
-                                putExtra(Intent.EXTRA_TITLE, "Chomp Clock Data Backup")
-                            }
-                            val shareIntent = Intent.createChooser(sendIntent, "Share Chomp Clock Backup")
-                            context.startActivity(shareIntent)
-                        }
-                    },
-                    shape = RoundedCornerShape(10.dp),
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF60A5FA)),
-                    border = BorderStroke(1.dp, Color(0xFF3F3F46))
-                ) {
-                    Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Quick Share Backup Text", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                if (isBackingUp) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    LinearProgressIndicator(
+                        modifier = Modifier.fillMaxWidth(),
+                        color = AppTheme.colors.primary,
+                        trackColor = AppTheme.colors.border
+                    )
                 }
             }
         }
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // 6. GITHUB RELEASES & APP UPDATE CHECKER (Connected to https://github.com/PASSK3YS/Chomp-Clock/releases)
+        // 7. GITHUB RELEASES & UPDATES
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(18.dp),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF18181B)),
-            border = BorderStroke(1.dp, Color(0xFF27272A))
+            colors = CardDefaults.cardColors(containerColor = AppTheme.colors.surface),
+            border = BorderStroke(1.dp, AppTheme.colors.border)
         ) {
             Column(modifier = Modifier.padding(18.dp)) {
                 Row(
@@ -985,293 +1290,125 @@ fun SettingsScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "GITHUB RELEASES & UPDATES",
+                        text = "UPDATES & RELEASES",
                         style = MaterialTheme.typography.labelSmall,
-                        color = Color(0xFF71717A),
+                        color = AppTheme.colors.textMuted,
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 1.sp
                     )
-                    Surface(
-                        shape = RoundedCornerShape(50),
-                        color = Color(0xFF1E293B),
-                        border = BorderStroke(1.dp, Color(0xFF334155))
-                    ) {
-                        Text(
-                            text = "PASSK3YS/Chomp-Clock",
-                            color = Color(0xFF94A3B8),
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                Text(
-                    text = "Checks directly against GitHub repository releases for new versions and APK downloads.",
-                    color = Color(0xFFA1A1AA),
-                    fontSize = 12.sp
-                )
-
-                Spacer(modifier = Modifier.height(14.dp))
-
-                // Check Button
-                Button(
-                    onClick = { viewModel.checkForUpdates() },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(46.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF27272A),
-                        contentColor = Color.White
-                    ),
-                    border = BorderStroke(1.dp, Color(0xFF3F3F46))
-                ) {
-                    if (updateCheckState is UpdateCheckState.Checking) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(18.dp),
-                            color = Color(0xFF60A5FA),
-                            strokeWidth = 2.dp
-                        )
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Text("Checking GitHub releases...", fontSize = 13.sp)
-                    } else {
-                        Icon(Icons.Default.CloudDownload, contentDescription = null, modifier = Modifier.size(18.dp), tint = Color(0xFF60A5FA))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Check for Updates", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                    }
-                }
-
-                // Status Results
-                when (val state = updateCheckState) {
-                    is UpdateCheckState.UpdateAvailable -> {
-                        Spacer(modifier = Modifier.height(14.dp))
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = Color(0xFF0F291E),
-                            border = BorderStroke(1.dp, Color(0xFF059669)),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Column(modifier = Modifier.padding(14.dp)) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = "NEW UPDATE AVAILABLE 🎉",
-                                        color = Color(0xFF34D399),
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 13.sp
-                                    )
-                                    Surface(
-                                        shape = RoundedCornerShape(6.dp),
-                                        color = Color(0xFF059669)
-                                    ) {
-                                        Text(
-                                            text = state.latestVersion,
-                                            color = Color.White,
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 11.sp,
-                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                        )
-                                    }
-                                }
-
-                                Spacer(modifier = Modifier.height(6.dp))
-                                Text(
-                                    text = state.releaseName,
-                                    color = Color.White,
-                                    fontWeight = FontWeight.SemiBold,
-                                    fontSize = 14.sp
-                                )
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    text = state.releaseNotes.take(200) + if (state.releaseNotes.length > 200) "..." else "",
-                                    color = Color(0xFFA1A1AA),
-                                    fontSize = 12.sp
-                                )
-
-                                Spacer(modifier = Modifier.height(12.dp))
-
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    Button(
-                                        onClick = {
-                                            val url = state.downloadUrl ?: state.htmlUrl
-                                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-                                            context.startActivity(intent)
-                                        },
-                                        modifier = Modifier.weight(1f),
-                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF059669)),
-                                        shape = RoundedCornerShape(8.dp)
-                                    ) {
-                                        Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(16.dp))
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text("Download APK", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                    }
-
-                                    OutlinedButton(
-                                        onClick = {
-                                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(state.htmlUrl))
-                                            context.startActivity(intent)
-                                        },
-                                        modifier = Modifier.weight(1f),
-                                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
-                                        border = BorderStroke(1.dp, Color(0xFF059669)),
-                                        shape = RoundedCornerShape(8.dp)
-                                    ) {
-                                        Text("View Release", fontSize = 12.sp)
-                                    }
-                                }
-                            }
+                    Text(
+                        text = "PASSK3YS / Chomp-Clock",
+                        color = AppTheme.colors.primary,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier.clickable {
+                            uriHandler.openUri("https://github.com/PASSK3YS/Chomp-Clock")
                         }
-                    }
-
-                    is UpdateCheckState.UpToDate -> {
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Surface(
-                            shape = RoundedCornerShape(10.dp),
-                            color = Color(0xFF064E3B).copy(alpha = 0.4f),
-                            border = BorderStroke(1.dp, Color(0xFF059669).copy(alpha = 0.5f)),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(12.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color(0xFF34D399), modifier = Modifier.size(20.dp))
-                                Spacer(modifier = Modifier.width(10.dp))
-                                Column {
-                                    Text(
-                                        text = "You're on the latest version (${state.currentVersion})",
-                                        color = Color(0xFF34D399),
-                                        fontWeight = FontWeight.SemiBold,
-                                        fontSize = 13.sp
-                                    )
-                                    Text(
-                                        text = "Latest verified GitHub release: ${state.releaseName}",
-                                        color = Color(0xFFA1A1AA),
-                                        fontSize = 11.sp
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    is UpdateCheckState.NoReleasesFound -> {
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Surface(
-                            shape = RoundedCornerShape(10.dp),
-                            color = Color(0xFF1E293B),
-                            border = BorderStroke(1.dp, Color(0xFF334155)),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Column(modifier = Modifier.padding(12.dp)) {
-                                Text(
-                                    text = "Connected to PASSK3YS/Chomp-Clock",
-                                    color = Color(0xFF60A5FA),
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 13.sp
-                                )
-                                Text(
-                                    text = "No releases published yet on GitHub. When you tag a release (e.g. v1.1.0), GitHub Actions will automatically generate the .APK file.",
-                                    color = Color(0xFFA1A1AA),
-                                    fontSize = 11.sp
-                                )
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Text(
-                                    text = "Open Releases Page →",
-                                    color = Color(0xFF60A5FA),
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    modifier = Modifier.clickable {
-                                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(state.repoUrl))
-                                        context.startActivity(intent)
-                                    }
-                                )
-                            }
-                        }
-                    }
-
-                    is UpdateCheckState.Error -> {
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Surface(
-                            shape = RoundedCornerShape(10.dp),
-                            color = Color(0xFF27272A),
-                            border = BorderStroke(1.dp, Color(0xFF3F3F46)),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Column(modifier = Modifier.padding(12.dp)) {
-                                Text(
-                                    text = "Unable to check GitHub Releases: ${state.errorMessage}",
-                                    color = Color(0xFFFCA5A5),
-                                    fontSize = 12.sp
-                                )
-                                Spacer(modifier = Modifier.height(6.dp))
-                                Text(
-                                    text = "Visit GitHub Releases Manually →",
-                                    color = Color(0xFF60A5FA),
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    modifier = Modifier.clickable {
-                                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(state.repoUrl))
-                                        context.startActivity(intent)
-                                    }
-                                )
-                            }
-                        }
-                    }
-
-                    UpdateCheckState.Checking -> {
-                        // Progress indicator shown in button
-                    }
-
-                    UpdateCheckState.Idle -> {
-                        // Idle state
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // Release notes collapsible
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { showWhatsNewDialog = !showWhatsNewDialog }
-                        .padding(vertical = 4.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("What's new in this build", color = Color(0xFF60A5FA), fontSize = 12.sp, fontWeight = FontWeight.Medium)
-                    Icon(
-                        imageVector = if (showWhatsNewDialog) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                        contentDescription = null,
-                        tint = Color(0xFF60A5FA),
-                        modifier = Modifier.size(18.dp)
                     )
                 }
 
-                AnimatedVisibility(visible = showWhatsNewDialog) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 8.dp)
-                            .background(Color(0xFF27272A).copy(alpha = 0.5f), RoundedCornerShape(10.dp))
-                            .padding(12.dp)
-                    ) {
-                        Text("• v1.1.3: Improved barcode lookup with resilient online name resolution and UK offline catalog", color = Color(0xFFA1A1AA), fontSize = 12.sp)
-                        Text("• v1.1.3: Persistent silent Android notification for active fasts with live stage progress", color = Color(0xFFA1A1AA), fontSize = 12.sp)
-                        Text("• v1.1.3: Confirmation dialog before ending an active fast", color = Color(0xFFA1A1AA), fontSize = 12.sp)
-                        Text("• v1.1.2: Data Backup & Restore (.JSON / .CSV) with merge & replace options", color = Color(0xFFA1A1AA), fontSize = 12.sp)
-                        Text("• v1.1.2: Expanded UK Supermarket Cereals, Dinner combos & Snacks catalog", color = Color(0xFFA1A1AA), fontSize = 12.sp)
-                        Text("• v1.1.1: Interactive 7-Stage Metabolic Science & Biomarker Telemetry Guide", color = Color(0xFFA1A1AA), fontSize = 12.sp)
-                        Text("• v1.1.0: UK Barcode scanning with instant product nutrition autofill", color = Color(0xFFA1A1AA), fontSize = 12.sp)
-                        Text("• v1.1.0: Stone & Pounds (st & lbs), Pounds, and KG unit switcher", color = Color(0xFFA1A1AA), fontSize = 12.sp)
+                Spacer(modifier = Modifier.height(12.dp))
+
+                when (val state = updateCheckState) {
+                    is UpdateCheckState.Idle -> {
+                        Button(
+                            onClick = { viewModel.checkForUpdates() },
+                            colors = ButtonDefaults.buttonColors(containerColor = AppTheme.colors.primary),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Default.Refresh, contentDescription = null, tint = Color.White)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Check for GitHub Updates", color = Color.White, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                    is UpdateCheckState.Checking -> {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 12.dp),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp),
+                                color = AppTheme.colors.primary,
+                                strokeWidth = 2.dp
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text("Checking GitHub Releases...", color = AppTheme.colors.textSecondary, fontSize = 13.sp)
+                        }
+                    }
+                    is UpdateCheckState.UpdateAvailable -> {
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = AppTheme.colors.success.copy(alpha = 0.15f),
+                            border = BorderStroke(1.dp, AppTheme.colors.success.copy(alpha = 0.4f)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(14.dp)) {
+                                Text(
+                                    text = "🎉 New Update Available: ${state.latestVersion}",
+                                    fontWeight = FontWeight.Bold,
+                                    color = AppTheme.colors.success,
+                                    fontSize = 15.sp
+                                )
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Text(
+                                    text = state.releaseNotes,
+                                    color = AppTheme.colors.textSecondary,
+                                    fontSize = 12.sp,
+                                    maxLines = 4
+                                )
+                                Spacer(modifier = Modifier.height(10.dp))
+                                Button(
+                                    onClick = {
+                                        val url = state.downloadUrl ?: state.htmlUrl
+                                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                                        context.startActivity(intent)
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = AppTheme.colors.success),
+                                    shape = RoundedCornerShape(8.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Icon(Icons.Default.Download, contentDescription = null, tint = Color.White)
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Download ${state.latestVersion} APK", color = Color.White, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                    }
+                    is UpdateCheckState.UpToDate -> {
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = AppTheme.colors.surfaceElevated,
+                            border = BorderStroke(1.dp, AppTheme.colors.border),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(14.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.CheckCircle, contentDescription = null, tint = AppTheme.colors.success, modifier = Modifier.size(20.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("You're on the latest version (${state.currentVersion})", color = AppTheme.colors.textPrimary, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                }
+                            }
+                        }
+                    }
+                    is UpdateCheckState.NoReleasesFound, is UpdateCheckState.Error -> {
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = AppTheme.colors.surfaceElevated,
+                            border = BorderStroke(1.dp, AppTheme.colors.border),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(14.dp)) {
+                                Text("No updates found or offline.", color = AppTheme.colors.textSecondary, fontSize = 13.sp)
+                                Spacer(modifier = Modifier.height(6.dp))
+                                TextButton(onClick = { viewModel.checkForUpdates() }) {
+                                    Text("Retry Check", color = AppTheme.colors.primary)
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -1279,61 +1416,44 @@ fun SettingsScreen(
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // 5. DANGER ZONE (With Confirmation Prompt)
+        // 8. DANGER ZONE
         Card(
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF450A0A)),
             modifier = Modifier.fillMaxWidth(),
-            border = BorderStroke(1.dp, Color(0xFF7F1D1D)),
-            shape = RoundedCornerShape(18.dp)
+            shape = RoundedCornerShape(18.dp),
+            colors = CardDefaults.cardColors(containerColor = AppTheme.colors.surface),
+            border = BorderStroke(1.dp, AppTheme.colors.danger.copy(alpha = 0.3f))
         ) {
             Column(modifier = Modifier.padding(18.dp)) {
                 Text(
                     text = "DANGER ZONE",
-                    color = Color(0xFFFCA5A5),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = AppTheme.colors.danger,
                     fontWeight = FontWeight.Bold,
-                    letterSpacing = 1.sp,
-                    style = MaterialTheme.typography.labelSmall
+                    letterSpacing = 1.sp
                 )
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
-                    text = "Permanently clear your local database and reset fasting/meal statistics.",
-                    color = Color(0xFFFCA5A5).copy(alpha = 0.8f),
+                    text = "Irreversibly delete all fasting sessions, food logs, and weigh-ins from this device.",
+                    color = AppTheme.colors.textSecondary,
                     fontSize = 12.sp
                 )
+
                 Spacer(modifier = Modifier.height(14.dp))
-                Button(
+
+                OutlinedButton(
                     onClick = { showDeleteConfirmDialog = true },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDC2626)),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(46.dp),
-                    shape = RoundedCornerShape(12.dp)
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = AppTheme.colors.danger),
+                    border = BorderStroke(1.dp, AppTheme.colors.danger.copy(alpha = 0.6f))
                 ) {
-                    Icon(Icons.Default.DeleteForever, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                    Icon(Icons.Default.DeleteOutline, contentDescription = null, tint = AppTheme.colors.danger)
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Delete All Device Data", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    Text("Clear All Application Data", fontWeight = FontWeight.Bold)
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(28.dp))
-        Text(
-            text = "Chomp Clock - v${BuildConfig.VERSION_NAME}",
-            modifier = Modifier.align(Alignment.CenterHorizontally),
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.SemiBold,
-            color = Color(0xFFA1A1AA),
-            textAlign = TextAlign.Center
-        )
-        Text(
-            text = "GitHub PASSK3YS/Chomp-Clock",
-            modifier = Modifier
-                .align(Alignment.CenterHorizontally)
-                .padding(top = 4.dp),
-            style = MaterialTheme.typography.bodySmall,
-            color = Color(0xFF71717A),
-            textAlign = TextAlign.Center
-        )
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(40.dp))
     }
 }

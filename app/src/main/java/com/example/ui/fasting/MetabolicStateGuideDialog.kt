@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.example.ui.theme.AppTheme
 import java.util.Locale
 
 enum class MetabolicViewMode(val title: String, val icon: String) {
@@ -68,8 +69,8 @@ fun MetabolicStateGuideDialog(
                 .fillMaxWidth(0.96f)
                 .fillMaxHeight(0.94f),
             shape = RoundedCornerShape(24.dp),
-            color = Color(0xFF111114),
-            border = BorderStroke(1.dp, Color(0xFF27272A))
+            color = AppTheme.colors.surface,
+            border = BorderStroke(1.dp, AppTheme.colors.border)
         ) {
             Column(
                 modifier = Modifier
@@ -98,7 +99,7 @@ fun MetabolicStateGuideDialog(
                             Text(
                                 "Metabolic States Guide",
                                 fontWeight = FontWeight.Bold,
-                                color = Color.White,
+                                color = AppTheme.colors.textPrimary,
                                 fontSize = 17.sp
                             )
                             Text(
@@ -106,7 +107,7 @@ fun MetabolicStateGuideDialog(
                                     "Fast Active: ${String.format(Locale.getDefault(), "%.1f", hoursElapsed)}h elapsed"
                                 else
                                     "7 Biological & Cellular Phases",
-                                color = if (hoursElapsed != null && hoursElapsed > 0) Color(0xFF34D399) else Color(0xFF71717A),
+                                color = if (hoursElapsed != null && hoursElapsed > 0) AppTheme.colors.success else AppTheme.colors.textMuted,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.SemiBold
                             )
@@ -117,7 +118,7 @@ fun MetabolicStateGuideDialog(
                         onClick = onDismiss,
                         modifier = Modifier.size(34.dp)
                     ) {
-                        Icon(Icons.Default.Close, contentDescription = "Close", tint = Color(0xFFA1A1AA))
+                        Icon(Icons.Default.Close, contentDescription = "Close", tint = AppTheme.colors.textMuted)
                     }
                 }
 
@@ -127,7 +128,7 @@ fun MetabolicStateGuideDialog(
                 if (hoursElapsed != null && currentActiveStage != null) {
                     Surface(
                         shape = RoundedCornerShape(12.dp),
-                        color = Color(0xFF18181C),
+                        color = AppTheme.colors.surfaceElevated,
                         border = BorderStroke(1.dp, currentActiveStage.accentColor.copy(alpha = 0.4f)),
                         modifier = Modifier.fillMaxWidth()
                     ) {
@@ -152,7 +153,7 @@ fun MetabolicStateGuideDialog(
                                     val hoursLeft = maxOf(0f, nextActiveStage.hourStart - hoursElapsed)
                                     Text(
                                         "Next in ${String.format(Locale.getDefault(), "%.1f", hoursLeft)}h",
-                                        color = Color(0xFF60A5FA),
+                                        color = AppTheme.colors.primary,
                                         fontSize = 10.sp,
                                         fontWeight = FontWeight.Bold
                                     )
@@ -169,7 +170,7 @@ fun MetabolicStateGuideDialog(
                                         .height(4.dp)
                                         .clip(RoundedCornerShape(2.dp)),
                                     color = currentActiveStage.accentColor,
-                                    trackColor = Color(0xFF27272A)
+                                    trackColor = AppTheme.colors.surfaceElevated
                                 )
                             }
                         }
@@ -181,7 +182,7 @@ fun MetabolicStateGuideDialog(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(Color(0xFF18181C), RoundedCornerShape(12.dp))
+                        .background(AppTheme.colors.surfaceElevated, RoundedCornerShape(12.dp))
                         .padding(3.dp),
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
@@ -192,8 +193,8 @@ fun MetabolicStateGuideDialog(
                                 .weight(1f)
                                 .clickable { viewMode = mode },
                             shape = RoundedCornerShape(10.dp),
-                            color = if (isSelected) Color(0xFF27272E) else Color.Transparent,
-                            border = if (isSelected) BorderStroke(1.dp, Color(0xFF3F3F46)) else null
+                            color = if (isSelected) AppTheme.colors.surface else Color.Transparent,
+                            border = if (isSelected) BorderStroke(1.dp, AppTheme.colors.border) else null
                         ) {
                             Row(
                                 modifier = Modifier.padding(vertical = 6.dp),
@@ -204,7 +205,7 @@ fun MetabolicStateGuideDialog(
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(
                                     mode.title,
-                                    color = if (isSelected) Color.White else Color(0xFFA1A1AA),
+                                    color = if (isSelected) AppTheme.colors.textPrimary else AppTheme.colors.textMuted,
                                     fontSize = 12.sp,
                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
                                 )
@@ -228,10 +229,10 @@ fun MetabolicStateGuideDialog(
 
                             Surface(
                                 shape = RoundedCornerShape(14.dp),
-                                color = if (isSelected) stage.accentColor.copy(alpha = 0.2f) else Color(0xFF18181C),
+                                color = if (isSelected) stage.accentColor.copy(alpha = 0.18f) else AppTheme.colors.surfaceElevated,
                                 border = BorderStroke(
                                     if (isSelected) 1.5.dp else 1.dp,
-                                    if (isSelected) stage.accentColor else if (isCurrentActive) stage.accentColor.copy(alpha = 0.7f) else Color(0xFF27272A)
+                                    if (isSelected) stage.accentColor else if (isCurrentActive) stage.accentColor.copy(alpha = 0.7f) else AppTheme.colors.border
                                 ),
                                 modifier = Modifier.clickable { selectedStageIndex = index }
                             ) {
@@ -245,7 +246,7 @@ fun MetabolicStateGuideDialog(
                                         Row(verticalAlignment = Alignment.CenterVertically) {
                                             Text(
                                                 stage.hoursRangeLabel,
-                                                color = if (isSelected) Color.White else Color(0xFFA1A1AA),
+                                                color = if (isSelected) AppTheme.colors.textPrimary else AppTheme.colors.textMuted,
                                                 fontSize = 11.sp,
                                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                                             )
@@ -265,12 +266,12 @@ fun MetabolicStateGuideDialog(
                                                 }
                                             } else if (isPassed) {
                                                 Spacer(modifier = Modifier.width(4.dp))
-                                                Text("✓", color = Color(0xFF34D399), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                                Text("✓", color = AppTheme.colors.success, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                                             }
                                         }
                                         Text(
                                             stage.title.take(18) + if (stage.title.length > 18) "…" else "",
-                                            color = if (isSelected) stage.accentColor else Color(0xFF71717A),
+                                            color = if (isSelected) stage.accentColor else AppTheme.colors.textSecondary,
                                             fontSize = 9.sp,
                                             fontWeight = FontWeight.SemiBold
                                         )
@@ -349,7 +350,7 @@ fun StageFocusDetailView(
         // Stage Hero Banner
         Surface(
             shape = RoundedCornerShape(16.dp),
-            color = Color(0xFF18181D),
+            color = AppTheme.colors.surfaceElevated,
             border = BorderStroke(1.dp, stage.accentColor.copy(alpha = 0.5f)),
             modifier = Modifier.fillMaxWidth()
         ) {
@@ -385,13 +386,13 @@ fun StageFocusDetailView(
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(
                                     "Stage ${stageIndex + 1} of $totalStages",
-                                    color = Color(0xFF71717A),
+                                    color = AppTheme.colors.textMuted,
                                     fontSize = 10.sp
                                 )
                             }
                             Text(
                                 stage.title,
-                                color = Color.White,
+                                color = AppTheme.colors.textPrimary,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 15.sp
                             )
@@ -402,15 +403,15 @@ fun StageFocusDetailView(
                         shape = RoundedCornerShape(8.dp),
                         color = when {
                             isCurrentActive -> stage.accentColor.copy(alpha = 0.25f)
-                            isPassed -> Color(0xFF064E3B)
-                            else -> Color(0xFF27272A)
+                            isPassed -> AppTheme.colors.success.copy(alpha = 0.2f)
+                            else -> AppTheme.colors.surface
                         },
                         border = BorderStroke(
                             1.dp,
                             when {
                                 isCurrentActive -> stage.accentColor
-                                isPassed -> Color(0xFF059669)
-                                else -> Color(0xFF3F3F46)
+                                isPassed -> AppTheme.colors.success
+                                else -> AppTheme.colors.border
                             }
                         )
                     ) {
@@ -422,8 +423,8 @@ fun StageFocusDetailView(
                             },
                             color = when {
                                 isCurrentActive -> stage.accentColor
-                                isPassed -> Color(0xFF34D399)
-                                else -> Color(0xFFA1A1AA)
+                                isPassed -> AppTheme.colors.success
+                                else -> AppTheme.colors.textMuted
                             },
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
@@ -442,7 +443,7 @@ fun StageFocusDetailView(
                 )
                 Text(
                     text = stage.shortSummary,
-                    color = Color(0xFFD4D4D8),
+                    color = AppTheme.colors.textSecondary,
                     fontSize = 12.sp,
                     lineHeight = 16.sp,
                     modifier = Modifier.padding(top = 2.dp)
@@ -453,8 +454,8 @@ fun StageFocusDetailView(
         // Primary Energy Fuel Source
         Surface(
             shape = RoundedCornerShape(12.dp),
-            color = Color(0xFF1A1A22),
-            border = BorderStroke(1.dp, Color(0xFF2D2D38)),
+            color = AppTheme.colors.surfaceElevated,
+            border = BorderStroke(1.dp, AppTheme.colors.border),
             modifier = Modifier.fillMaxWidth()
         ) {
             Row(
@@ -466,14 +467,14 @@ fun StageFocusDetailView(
                 Column {
                     Text(
                         "PRIMARY ENERGY SOURCE",
-                        color = Color(0xFF71717A),
+                        color = AppTheme.colors.textMuted,
                         fontSize = 9.sp,
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 0.8.sp
                     )
                     Text(
                         stage.primaryFuelSource,
-                        color = Color(0xFFE4E4E7),
+                        color = AppTheme.colors.textPrimary,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold
                     )
@@ -484,7 +485,7 @@ fun StageFocusDetailView(
         // Biomarker Matrix Dashboard (2x2 Grid)
         Text(
             "HORMONAL & METABOLIC TELEMETRY",
-            color = Color(0xFF71717A),
+            color = AppTheme.colors.textMuted,
             fontSize = 10.sp,
             fontWeight = FontWeight.Bold,
             letterSpacing = 1.sp
@@ -536,7 +537,7 @@ fun StageFocusDetailView(
                     icon = "💪",
                     label = "Growth Hormone (HGH)",
                     value = stage.biomarkers.growthHormone,
-                    accentColor = Color(0xFF34D399),
+                    accentColor = AppTheme.colors.success,
                     modifier = Modifier.fillMaxWidth()
                 )
             }
@@ -545,8 +546,8 @@ fun StageFocusDetailView(
         // Cellular & Physiological Mechanisms
         Surface(
             shape = RoundedCornerShape(14.dp),
-            color = Color(0xFF18181C),
-            border = BorderStroke(1.dp, Color(0xFF27272A)),
+            color = AppTheme.colors.surfaceElevated,
+            border = BorderStroke(1.dp, AppTheme.colors.border),
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(modifier = Modifier.padding(12.dp)) {
@@ -555,7 +556,7 @@ fun StageFocusDetailView(
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         "PHYSIOLOGICAL MECHANISM",
-                        color = Color(0xFF71717A),
+                        color = AppTheme.colors.textMuted,
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 0.8.sp
@@ -564,7 +565,7 @@ fun StageFocusDetailView(
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
                     text = stage.physiologicalProcess,
-                    color = Color(0xFFD4D4D8),
+                    color = AppTheme.colors.textSecondary,
                     fontSize = 12.sp,
                     lineHeight = 17.sp
                 )
@@ -574,14 +575,14 @@ fun StageFocusDetailView(
         // Key Biological Benefits
         Surface(
             shape = RoundedCornerShape(14.dp),
-            color = Color(0xFF18181C),
-            border = BorderStroke(1.dp, Color(0xFF27272A)),
+            color = AppTheme.colors.surfaceElevated,
+            border = BorderStroke(1.dp, AppTheme.colors.border),
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(modifier = Modifier.padding(12.dp)) {
                 Text(
                     "KEY BIOLOGICAL BENEFITS",
-                    color = Color(0xFF71717A),
+                    color = AppTheme.colors.textMuted,
                     fontSize = 10.sp,
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 0.8.sp
@@ -592,9 +593,9 @@ fun StageFocusDetailView(
                         modifier = Modifier.padding(vertical = 2.dp),
                         verticalAlignment = Alignment.Top
                     ) {
-                        Text("✓", color = Color(0xFF34D399), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Text("✓", color = AppTheme.colors.success, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text(benefit, color = Color(0xFFE4E4E7), fontSize = 12.sp)
+                        Text(benefit, color = AppTheme.colors.textPrimary, fontSize = 12.sp)
                     }
                 }
             }
@@ -603,8 +604,8 @@ fun StageFocusDetailView(
         // Pro Fasting Tip Box
         Surface(
             shape = RoundedCornerShape(12.dp),
-            color = Color(0xFF1E293B).copy(alpha = 0.5f),
-            border = BorderStroke(1.dp, Color(0xFF334155)),
+            color = AppTheme.colors.primary.copy(alpha = 0.12f),
+            border = BorderStroke(1.dp, AppTheme.colors.primary.copy(alpha = 0.35f)),
             modifier = Modifier.fillMaxWidth()
         ) {
             Row(
@@ -616,14 +617,14 @@ fun StageFocusDetailView(
                 Column {
                     Text(
                         "PRACTICAL GUIDANCE & TIP",
-                        color = Color(0xFF93C5FD),
+                        color = AppTheme.colors.primary,
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 0.8.sp
                     )
                     Text(
                         stage.tips,
-                        color = Color(0xFFBFDBFE),
+                        color = AppTheme.colors.textPrimary,
                         fontSize = 11.sp,
                         lineHeight = 15.sp,
                         modifier = Modifier.padding(top = 2.dp)
@@ -647,10 +648,10 @@ fun StageFocusDetailView(
                     .height(42.dp),
                 shape = RoundedCornerShape(10.dp),
                 colors = ButtonDefaults.outlinedButtonColors(
-                    contentColor = Color(0xFFA1A1AA),
-                    disabledContentColor = Color(0xFF3F3F46)
+                    contentColor = AppTheme.colors.textPrimary,
+                    disabledContentColor = AppTheme.colors.textMuted
                 ),
-                border = BorderStroke(1.dp, if (hasPrevious) Color(0xFF3F3F46) else Color(0xFF27272A))
+                border = BorderStroke(1.dp, if (hasPrevious) AppTheme.colors.border else AppTheme.colors.border.copy(alpha = 0.4f))
             ) {
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Previous Stage", modifier = Modifier.size(16.dp))
                 Spacer(modifier = Modifier.width(6.dp))
@@ -665,8 +666,8 @@ fun StageFocusDetailView(
                     .height(42.dp),
                 shape = RoundedCornerShape(10.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFF3B82F6),
-                    disabledContainerColor = Color(0xFF27272A)
+                    containerColor = AppTheme.colors.primary,
+                    disabledContainerColor = AppTheme.colors.surfaceElevated
                 )
             ) {
                 Text("Next Stage", fontSize = 12.sp, fontWeight = FontWeight.Bold)
@@ -688,8 +689,8 @@ fun BiomarkerTile(
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(10.dp),
-        color = Color(0xFF18181C),
-        border = BorderStroke(1.dp, Color(0xFF27272A))
+        color = AppTheme.colors.surfaceElevated,
+        border = BorderStroke(1.dp, AppTheme.colors.border)
     ) {
         Column(modifier = Modifier.padding(8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -697,7 +698,7 @@ fun BiomarkerTile(
                 Spacer(modifier = Modifier.width(4.dp))
                 Text(
                     label,
-                    color = Color(0xFF71717A),
+                    color = AppTheme.colors.textMuted,
                     fontSize = 9.sp,
                     fontWeight = FontWeight.Bold,
                     maxLines = 1
@@ -706,7 +707,7 @@ fun BiomarkerTile(
             Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = value,
-                color = Color.White,
+                color = AppTheme.colors.textPrimary,
                 fontSize = 11.sp,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 2,
@@ -729,7 +730,7 @@ fun FullTimelineJourneyView(
         item {
             Text(
                 "COMPLETE 7-STAGE FASTING PATHWAY",
-                color = Color(0xFF71717A),
+                color = AppTheme.colors.textMuted,
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Bold,
                 letterSpacing = 1.sp,
@@ -743,10 +744,10 @@ fun FullTimelineJourneyView(
 
             Surface(
                 shape = RoundedCornerShape(14.dp),
-                color = if (isCurrentActive) Color(0xFF1E1E28) else Color(0xFF18181C),
+                color = if (isCurrentActive) stage.accentColor.copy(alpha = 0.15f) else AppTheme.colors.surfaceElevated,
                 border = BorderStroke(
                     if (isCurrentActive) 1.5.dp else 1.dp,
-                    if (isCurrentActive) stage.accentColor else Color(0xFF27272A)
+                    if (isCurrentActive) stage.accentColor else AppTheme.colors.border
                 ),
                 modifier = Modifier
                     .fillMaxWidth()
@@ -778,7 +779,7 @@ fun FullTimelineJourneyView(
                                 )
                                 Text(
                                     stage.title,
-                                    color = Color.White,
+                                    color = AppTheme.colors.textPrimary,
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 13.sp
                                 )
@@ -789,8 +790,8 @@ fun FullTimelineJourneyView(
                             shape = RoundedCornerShape(6.dp),
                             color = when {
                                 isCurrentActive -> stage.accentColor.copy(alpha = 0.2f)
-                                isPassed -> Color(0xFF064E3B)
-                                else -> Color(0xFF27272A)
+                                isPassed -> AppTheme.colors.success.copy(alpha = 0.2f)
+                                else -> AppTheme.colors.surface
                             }
                         ) {
                             Text(
@@ -801,8 +802,8 @@ fun FullTimelineJourneyView(
                                 },
                                 color = when {
                                     isCurrentActive -> stage.accentColor
-                                    isPassed -> Color(0xFF34D399)
-                                    else -> Color(0xFF60A5FA)
+                                    isPassed -> AppTheme.colors.success
+                                    else -> AppTheme.colors.primary
                                 },
                                 fontSize = 9.sp,
                                 fontWeight = FontWeight.Bold,
@@ -815,7 +816,7 @@ fun FullTimelineJourneyView(
 
                     Text(
                         text = stage.shortSummary,
-                        color = Color(0xFFA1A1AA),
+                        color = AppTheme.colors.textSecondary,
                         fontSize = 11.sp,
                         lineHeight = 15.sp
                     )
@@ -829,12 +830,12 @@ fun FullTimelineJourneyView(
                     ) {
                         Text(
                             text = "Fuel: ${stage.primaryFuelSource.take(30)}...",
-                            color = Color(0xFF71717A),
+                            color = AppTheme.colors.textMuted,
                             fontSize = 10.sp
                         )
                         Text(
                             text = "Tap for deep dive",
-                            color = Color(0xFF3B82F6),
+                            color = AppTheme.colors.primary,
                             fontSize = 10.sp,
                             fontWeight = FontWeight.SemiBold
                         )

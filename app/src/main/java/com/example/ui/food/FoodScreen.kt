@@ -2,7 +2,6 @@ package com.example.ui.food
 
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
@@ -31,71 +30,97 @@ import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.data.local.entity.FoodEntry
 import com.example.data.repository.FoodSearchResult
+import com.example.data.repository.HeightUnit
 import com.example.data.repository.UserPreferences
+import com.example.data.repository.WeightUnit
 import com.example.ui.components.AvatarPickerDialog
 import com.example.ui.components.BarcodeScannerScreen
 import com.example.ui.components.UserAvatarView
 import com.example.ui.settings.SettingsViewModel
+import com.example.ui.theme.AppTheme
 import com.example.ui.weight.WeightViewModel
+import com.example.util.CalorieWeightCalculator
+import com.example.util.WeightTrajectory
+import com.example.util.WeightUtils
 import java.text.SimpleDateFormat
 import java.util.*
 
+val UK_SUPERMARKET_CHIPS = listOf("All", "Tesco", "Sainsbury's", "ASDA", "M&S", "Morrisons", "Aldi/Lidl", "Cereals", "Dinner Combos", "Snacks & Drinks", "UK Brands")
+
 data class MealCategory(
     val name: String,
-    val icon: String,
-    val subtitle: String
+    val iconEmoji: String,
+    val recommendedPct: String
 )
 
 val ALL_MEAL_CATEGORIES = listOf(
-    MealCategory("Breakfast", "🍳", "Morning meal"),
-    MealCategory("Lunch", "🥗", "Midday meal"),
-    MealCategory("Dinner", "🍲", "Evening meal"),
-    MealCategory("Snacks", "🥨", "Bites & snacks"),
-    MealCategory("Drinks", "💧", "Hydration & beverages")
-)
-
-val UK_SUPERMARKET_CHIPS = listOf(
-    "All", "Cereals", "Dinner Combos", "Snacks & Drinks", "Tesco", "Sainsbury's", "ASDA", "M&S", "Morrisons", "Aldi/Lidl", "UK Brands"
+    MealCategory("Breakfast", "🍳", "25%"),
+    MealCategory("Lunch", "🥗", "35%"),
+    MealCategory("Dinner", "🍲", "30%"),
+    MealCategory("Snacks", "🍎", "10%"),
+    MealCategory("Drinks", "💧", "0-5%")
 )
 
 @Composable
 fun FoodScreen(
     userPrefs: UserPreferences?,
     viewModel: FoodViewModel = viewModel(),
-    weightViewModel: WeightViewModel = viewModel(),
-    settingsViewModel: SettingsViewModel = viewModel()
+    settingsViewModel: SettingsViewModel = viewModel(),
+    weightViewModel: WeightViewModel = viewModel()
 ) {
     val context = LocalContext.current
     val entries by viewModel.foodEntries.collectAsState()
     val weightEntries by weightViewModel.weightEntries.collectAsState()
 
     var showFoodSearchDialog by remember { mutableStateOf(false) }
-    var selectedMealForAdd by remember { mutableStateOf("Breakfast") }
+    var showCalorieGoalDialog by remember { mutableStateOf(false) }
     var showScanner by remember { mutableStateOf(false) }
-    var selectedMealForScan by remember { mutableStateOf("Breakfast") }
     var showAvatarPicker by remember { mutableStateOf(false) }
+    var selectedMealForAdd by remember { mutableStateOf("Breakfast") }
+    var selectedMealForScan by remember { mutableStateOf("Breakfast") }
 
+    // Scanned product dialog state
     var scannedProductToConfirm by remember { mutableStateOf<FoodSearchResult?>(null) }
     var scannedFallbackBarcode by remember { mutableStateOf<String?>(null) }
-    var showCalorieGoalDialog by remember { mutableStateOf(false) }
 
     val username = userPrefs?.username ?: "User"
     val avatarId = userPrefs?.avatarId
-    val gender = userPrefs?.gender ?: "Male"
-    val heightCm = userPrefs?.heightCm ?: 170f
-    val latestWeight = weightEntries.firstOrNull()?.weightKg ?: 70f
-    val calculatedBmr = weightViewModel.calculateDailyCalories(latestWeight, heightCm, 30, gender)
-    val targetDailyCalories = if (userPrefs?.useCustomCalories == true && (userPrefs.customDailyCalories) > 0) {
-        userPrefs.customDailyCalories
-    } else {
-        calculatedBmr
-    }
 
     val calendar = Calendar.getInstance()
     val greeting = when (calendar.get(Calendar.HOUR_OF_DAY)) {
         in 0..11 -> "Good morning"
         in 12..16 -> "Good afternoon"
         else -> "Good evening"
+    }
+
+    val latestWeightKg = weightEntries.firstOrNull()?.weightKg ?: 70f
+    val userHeightCm = userPrefs?.heightCm ?: 170f
+    val userWaistCm = userPrefs?.waistCm
+    val userGender = userPrefs?.gender ?: "Male"
+    val weightUnit = userPrefs?.weightUnit ?: WeightUnit.KG
+    val heightUnit = userPrefs?.heightUnit ?: HeightUnit.CM
+
+    val calculatedBmr = remember(latestWeightKg, userHeightCm, userGender, userWaistCm) {
+        weightViewModel.calculateDailyCalories(latestWeightKg, userHeightCm, 30, userGender, userWaistCm)
+    }
+
+    val targetDailyCalories = if (userPrefs?.useCustomCalories == true && userPrefs.customDailyCalories > 0) {
+        userPrefs.customDailyCalories
+    } else {
+        calculatedBmr
+    }
+
+    // Weekly weight loss projection
+    val weeklyProjection = remember(targetDailyCalories, latestWeightKg, userHeightCm, userWaistCm, userGender, weightUnit) {
+        CalorieWeightCalculator.calculateWeeklyProjection(
+            dailyBudget = targetDailyCalories,
+            weightKg = latestWeightKg,
+            heightCm = userHeightCm,
+            waistCm = userWaistCm,
+            age = 30,
+            gender = userGender,
+            unit = weightUnit
+        )
     }
 
     var isBarcodeLookingUp by remember { mutableStateOf(false) }
@@ -123,8 +148,8 @@ fun FoodScreen(
         Dialog(onDismissRequest = { isBarcodeLookingUp = false }) {
             Surface(
                 shape = RoundedCornerShape(20.dp),
-                color = Color(0xFF18181B),
-                border = BorderStroke(1.dp, Color(0xFF27272A)),
+                color = AppTheme.colors.surface,
+                border = BorderStroke(1.dp, AppTheme.colors.border),
                 modifier = Modifier.padding(16.dp)
             ) {
                 Column(
@@ -132,7 +157,7 @@ fun FoodScreen(
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     CircularProgressIndicator(
-                        color = Color(0xFF3B82F6),
+                        color = AppTheme.colors.primary,
                         strokeWidth = 3.dp,
                         modifier = Modifier.size(44.dp)
                     )
@@ -140,13 +165,13 @@ fun FoodScreen(
                     Text(
                         text = "Looking up UK Barcode...",
                         fontWeight = FontWeight.Bold,
-                        color = Color.White,
+                        color = AppTheme.colors.textPrimary,
                         fontSize = 15.sp
                     )
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
                         text = "Searching Open Food Facts & UK Supermarket database",
-                        color = Color(0xFFA1A1AA),
+                        color = AppTheme.colors.textSecondary,
                         fontSize = 12.sp,
                         textAlign = TextAlign.Center
                     )
@@ -234,6 +259,11 @@ fun FoodScreen(
             currentUseCustom = userPrefs?.useCustomCalories ?: false,
             currentCustomCalories = userPrefs?.customDailyCalories ?: 2000,
             calculatedBmr = calculatedBmr,
+            latestWeightKg = latestWeightKg,
+            heightCm = userHeightCm,
+            waistCm = userWaistCm,
+            gender = userGender,
+            weightUnit = weightUnit,
             onDismiss = { showCalorieGoalDialog = false },
             onSave = { useCustom, calories ->
                 settingsViewModel.updateUseCustomCalories(useCustom)
@@ -278,7 +308,7 @@ fun FoodScreen(
                     val dateFormat = SimpleDateFormat("dd-MM-yyyy", Locale.UK)
                     Text(
                         text = dateFormat.format(Date()),
-                        color = Color(0xFFA1A1AA),
+                        color = AppTheme.colors.textMuted,
                         style = MaterialTheme.typography.bodySmall,
                         fontWeight = FontWeight.Medium
                     )
@@ -286,7 +316,7 @@ fun FoodScreen(
                         text = "$greeting, $username",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
-                        color = Color.White
+                        color = AppTheme.colors.textPrimary
                     )
                 }
             }
@@ -299,12 +329,12 @@ fun FoodScreen(
                         showScanner = true
                     },
                     shape = CircleShape,
-                    color = Color(0xFF27272A),
-                    border = BorderStroke(1.dp, Color(0xFF3F3F46)),
+                    color = AppTheme.colors.surfaceElevated,
+                    border = BorderStroke(1.dp, AppTheme.colors.border),
                     modifier = Modifier.size(38.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
-                        Icon(Icons.Default.QrCodeScanner, contentDescription = "Scan Barcode", tint = Color(0xFF60A5FA), modifier = Modifier.size(20.dp))
+                        Icon(Icons.Default.QrCodeScanner, contentDescription = "Scan Barcode", tint = AppTheme.colors.primary, modifier = Modifier.size(20.dp))
                     }
                 }
 
@@ -314,7 +344,7 @@ fun FoodScreen(
                         showFoodSearchDialog = true
                     },
                     shape = CircleShape,
-                    color = Color(0xFF3B82F6),
+                    color = AppTheme.colors.primary,
                     modifier = Modifier.size(38.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
@@ -326,11 +356,11 @@ fun FoodScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Daily Calorie Target Card
+        // Daily Calorie Target Card with Weekly Weight Loss Projection
         Surface(
             shape = RoundedCornerShape(16.dp),
-            color = Color(0xFF18181B),
-            border = BorderStroke(1.dp, Color(0xFF27272A)),
+            color = AppTheme.colors.surface,
+            border = BorderStroke(1.dp, AppTheme.colors.border),
             modifier = Modifier
                 .fillMaxWidth()
                 .clickable { showCalorieGoalDialog = true }
@@ -346,19 +376,19 @@ fun FoodScreen(
                             Text(
                                 "DAILY CALORIE BUDGET",
                                 style = MaterialTheme.typography.labelSmall,
-                                color = Color(0xFF71717A),
+                                color = AppTheme.colors.textMuted,
                                 fontWeight = FontWeight.Bold,
                                 letterSpacing = 1.2.sp
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Surface(
                                 shape = RoundedCornerShape(6.dp),
-                                color = if (userPrefs?.useCustomCalories == true) Color(0xFF3B82F6).copy(alpha = 0.25f) else Color(0xFF27272A),
-                                border = BorderStroke(1.dp, if (userPrefs?.useCustomCalories == true) Color(0xFF3B82F6) else Color(0xFF3F3F46))
+                                color = if (userPrefs?.useCustomCalories == true) AppTheme.colors.primary.copy(alpha = 0.18f) else AppTheme.colors.surfaceElevated,
+                                border = BorderStroke(1.dp, if (userPrefs?.useCustomCalories == true) AppTheme.colors.primary else AppTheme.colors.border)
                             ) {
                                 Text(
                                     text = if (userPrefs?.useCustomCalories == true) "CUSTOM" else "AUTO BMR",
-                                    color = if (userPrefs?.useCustomCalories == true) Color(0xFF60A5FA) else Color(0xFFA1A1AA),
+                                    color = if (userPrefs?.useCustomCalories == true) AppTheme.colors.primary else AppTheme.colors.textSecondary,
                                     fontSize = 9.sp,
                                     fontWeight = FontWeight.Bold,
                                     modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
@@ -369,13 +399,13 @@ fun FoodScreen(
                         Row(verticalAlignment = Alignment.Bottom) {
                             Text(
                                 "$totalCaloriesConsumed",
-                                color = Color.White,
+                                color = AppTheme.colors.textPrimary,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 22.sp
                             )
                             Text(
                                 " / $targetDailyCalories kcal",
-                                color = Color(0xFFA1A1AA),
+                                color = AppTheme.colors.textSecondary,
                                 fontSize = 13.sp,
                                 modifier = Modifier.padding(bottom = 2.dp, start = 4.dp)
                             )
@@ -386,7 +416,7 @@ fun FoodScreen(
                             Text(
                                 "REMAINING",
                                 style = MaterialTheme.typography.labelSmall,
-                                color = Color(0xFF71717A),
+                                color = AppTheme.colors.textMuted,
                                 fontWeight = FontWeight.Bold,
                                 letterSpacing = 1.sp
                             )
@@ -394,13 +424,13 @@ fun FoodScreen(
                             Icon(
                                 Icons.Default.Tune,
                                 contentDescription = "Edit Calorie Goal",
-                                tint = Color(0xFF60A5FA),
+                                tint = AppTheme.colors.primary,
                                 modifier = Modifier.size(14.dp)
                             )
                         }
                         Text(
                             "$remainingCalories kcal",
-                            color = if (totalCaloriesConsumed > targetDailyCalories) Color(0xFFF87171) else Color(0xFF34D399),
+                            color = if (totalCaloriesConsumed > targetDailyCalories) AppTheme.colors.danger else AppTheme.colors.success,
                             fontWeight = FontWeight.Bold,
                             fontSize = 16.sp
                         )
@@ -414,10 +444,53 @@ fun FoodScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(8.dp),
-                    color = if (totalCaloriesConsumed > targetDailyCalories) Color(0xFFEF4444) else Color(0xFF34D399),
-                    trackColor = Color(0xFF27272A),
+                    color = if (totalCaloriesConsumed > targetDailyCalories) AppTheme.colors.danger else AppTheme.colors.success,
+                    trackColor = AppTheme.colors.surfaceElevated,
                     strokeCap = StrokeCap.Round
                 )
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Weekly Weight Loss Projection Chip
+                val projColor = when (weeklyProjection.trajectory) {
+                    WeightTrajectory.WEIGHT_LOSS -> AppTheme.colors.success
+                    WeightTrajectory.WEIGHT_GAIN -> AppTheme.colors.warning
+                    WeightTrajectory.MAINTENANCE -> AppTheme.colors.primary
+                }
+
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = projColor.copy(alpha = if (AppTheme.colors.isDark) 0.15f else 0.10f),
+                    border = BorderStroke(1.dp, projColor.copy(alpha = 0.35f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = if (weeklyProjection.trajectory == WeightTrajectory.WEIGHT_LOSS) Icons.Default.TrendingDown else Icons.Default.TrendingUp,
+                                contentDescription = null,
+                                tint = projColor,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = weeklyProjection.summaryText,
+                                color = projColor,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp
+                            )
+                        }
+                        Text(
+                            text = "TDEE: ${weeklyProjection.tdee} kcal/day",
+                            color = AppTheme.colors.textMuted,
+                            fontSize = 11.sp
+                        )
+                    }
+                }
             }
         }
 
@@ -426,7 +499,7 @@ fun FoodScreen(
         Text(
             "TODAY'S MEALS",
             style = MaterialTheme.typography.labelSmall,
-            color = Color(0xFF71717A),
+            color = AppTheme.colors.textMuted,
             fontWeight = FontWeight.Bold,
             letterSpacing = 1.2.sp
         )
@@ -445,48 +518,34 @@ fun FoodScreen(
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF18181B)),
-                    border = BorderStroke(1.dp, Color(0xFF27272A))
+                    colors = CardDefaults.cardColors(containerColor = AppTheme.colors.surface),
+                    border = BorderStroke(1.dp, AppTheme.colors.border)
                 ) {
                     Column(modifier = Modifier.padding(14.dp)) {
-                        // Header of the meal card
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Surface(
-                                    shape = CircleShape,
-                                    color = Color(0xFF27272A),
-                                    modifier = Modifier.size(36.dp)
-                                ) {
-                                    Box(contentAlignment = Alignment.Center) {
-                                        Text(mealCat.icon, fontSize = 18.sp)
-                                    }
-                                }
-                                Spacer(modifier = Modifier.width(10.dp))
+                                Text(mealCat.iconEmoji, fontSize = 20.sp)
+                                Spacer(modifier = Modifier.width(8.dp))
                                 Column {
                                     Text(
                                         text = mealCat.name,
+                                        style = MaterialTheme.typography.titleMedium,
                                         fontWeight = FontWeight.Bold,
-                                        color = Color.White,
-                                        fontSize = 15.sp
+                                        color = AppTheme.colors.textPrimary
                                     )
                                     Text(
-                                        text = if (mealItems.isEmpty()) "0 kcal" else "$mealTotalCalories kcal",
-                                        color = if (mealItems.isNotEmpty()) Color(0xFF34D399) else Color(0xFF71717A),
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Medium
+                                        text = "Rec: ${mealCat.recommendedPct} • $mealTotalCalories kcal",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = if (mealTotalCalories > 0) AppTheme.colors.primary else AppTheme.colors.textMuted
                                     )
                                 }
                             }
 
-                            // Quick buttons: Barcode scan & Search Add
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                                 IconButton(
                                     onClick = {
                                         selectedMealForScan = mealCat.name
@@ -496,8 +555,8 @@ fun FoodScreen(
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.QrCodeScanner,
-                                        contentDescription = "Scan for ${mealCat.name}",
-                                        tint = Color(0xFFA1A1AA),
+                                        contentDescription = "Scan barcode for ${mealCat.name}",
+                                        tint = AppTheme.colors.textSecondary,
                                         modifier = Modifier.size(18.dp)
                                     )
                                 }
@@ -511,7 +570,7 @@ fun FoodScreen(
                                     Icon(
                                         imageVector = Icons.Default.Add,
                                         contentDescription = "Add to ${mealCat.name}",
-                                        tint = Color(0xFF60A5FA),
+                                        tint = AppTheme.colors.primary,
                                         modifier = Modifier.size(20.dp)
                                     )
                                 }
@@ -529,8 +588,8 @@ fun FoodScreen(
                                         showFoodSearchDialog = true
                                     },
                                 shape = RoundedCornerShape(10.dp),
-                                color = Color(0xFF141416),
-                                border = BorderStroke(1.dp, Color(0xFF202024))
+                                color = AppTheme.colors.surfaceElevated,
+                                border = BorderStroke(1.dp, AppTheme.colors.border)
                             ) {
                                 Row(
                                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
@@ -539,12 +598,12 @@ fun FoodScreen(
                                 ) {
                                     Text(
                                         "No items logged yet",
-                                        color = Color(0xFF52525B),
+                                        color = AppTheme.colors.textMuted,
                                         fontSize = 12.sp
                                     )
                                     Text(
                                         "+ Log ${mealCat.name}",
-                                        color = Color(0xFF60A5FA),
+                                        color = AppTheme.colors.primary,
                                         fontSize = 12.sp,
                                         fontWeight = FontWeight.SemiBold
                                     )
@@ -582,11 +641,11 @@ fun FoodItemRow(
     if (showConfirmDelete) {
         AlertDialog(
             onDismissRequest = { showConfirmDelete = false },
-            title = { Text("Delete Food Log", color = Color.White, fontWeight = FontWeight.Bold) },
+            title = { Text("Delete Food Log", color = AppTheme.colors.textPrimary, fontWeight = FontWeight.Bold) },
             text = {
                 Text(
                     "Remove \"${item.name}\" (${item.calories} kcal) from today's log?",
-                    color = Color(0xFFA1A1AA),
+                    color = AppTheme.colors.textSecondary,
                     fontSize = 14.sp
                 )
             },
@@ -596,25 +655,25 @@ fun FoodItemRow(
                         onDelete()
                         showConfirmDelete = false
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDC2626))
+                    colors = ButtonDefaults.buttonColors(containerColor = AppTheme.colors.danger)
                 ) {
                     Text("Delete", color = Color.White, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showConfirmDelete = false }) {
-                    Text("Cancel", color = Color(0xFFA1A1AA))
+                    Text("Cancel", color = AppTheme.colors.textMuted)
                 }
             },
-            containerColor = Color(0xFF18181B),
+            containerColor = AppTheme.colors.surface,
             shape = RoundedCornerShape(16.dp)
         )
     }
 
     Surface(
         shape = RoundedCornerShape(10.dp),
-        color = Color(0xFF27272A).copy(alpha = 0.5f),
-        border = BorderStroke(1.dp, Color(0xFF3F3F46).copy(alpha = 0.5f)),
+        color = AppTheme.colors.surfaceElevated,
+        border = BorderStroke(1.dp, AppTheme.colors.border),
         modifier = Modifier.fillMaxWidth()
     ) {
         Row(
@@ -627,7 +686,7 @@ fun FoodItemRow(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = item.name,
-                    color = Color.White,
+                    color = AppTheme.colors.textPrimary,
                     fontWeight = FontWeight.Medium,
                     fontSize = 13.sp,
                     maxLines = 1,
@@ -635,7 +694,7 @@ fun FoodItemRow(
                 )
                 Text(
                     text = item.servingSize,
-                    color = Color(0xFFA1A1AA),
+                    color = AppTheme.colors.textMuted,
                     fontSize = 11.sp
                 )
             }
@@ -645,7 +704,7 @@ fun FoodItemRow(
             ) {
                 Text(
                     text = "${item.calories} kcal",
-                    color = Color(0xFF34D399),
+                    color = AppTheme.colors.success,
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 13.sp
                 )
@@ -656,12 +715,29 @@ fun FoodItemRow(
                     Icon(
                         imageVector = Icons.Default.DeleteOutline,
                         contentDescription = "Delete food entry",
-                        tint = Color(0xFF71717A),
+                        tint = AppTheme.colors.textMuted,
                         modifier = Modifier.size(17.dp)
                     )
                 }
             }
         }
+    }
+}
+
+fun getSupermarketBrandColor(brand: String): Color {
+    return when {
+        brand.contains("Tesco", ignoreCase = true) -> Color(0xFF0284C7)
+        brand.contains("Sainsbury", ignoreCase = true) -> Color(0xFFEA580C)
+        brand.contains("ASDA", ignoreCase = true) -> Color(0xFF16A34A)
+        brand.contains("M&S", ignoreCase = true) || brand.contains("Marks", ignoreCase = true) -> Color(0xFFD97706)
+        brand.contains("Morrisons", ignoreCase = true) -> Color(0xFF65A30D)
+        brand.contains("Aldi", ignoreCase = true) -> Color(0xFF2563EB)
+        brand.contains("Lidl", ignoreCase = true) -> Color(0xFFDC2626)
+        brand.contains("Heinz", ignoreCase = true) -> Color(0xFF0D9488)
+        brand.contains("Warburtons", ignoreCase = true) -> Color(0xFFDB2777)
+        brand.contains("Cadbury", ignoreCase = true) -> Color(0xFF7C3AED)
+        brand.contains("Greggs", ignoreCase = true) -> Color(0xFF0284C7)
+        else -> Color(0xFF64748B)
     }
 }
 
@@ -682,13 +758,11 @@ fun UkFoodSearchDialog(
     val isSearching by viewModel.isSearching.collectAsState()
 
     var selectedMeal by remember { mutableStateOf(initialMealType) }
-    var activeTab by remember { mutableStateOf(0) } // 0: UK Supermarket Search, 1: Custom Manual Entry
+    var activeTab by remember { mutableStateOf(0) }
 
-    // Selected item for portion customization
     var selectedItemForPortion by remember { mutableStateOf<FoodSearchResult?>(null) }
     var portionMultiplier by remember { mutableStateOf(1.0f) }
 
-    // Manual custom input states
     var customName by remember { mutableStateOf("") }
     var customServing by remember { mutableStateOf("1 serving") }
     var customCalories by remember { mutableStateOf("") }
@@ -696,8 +770,8 @@ fun UkFoodSearchDialog(
     Dialog(onDismissRequest = onDismiss) {
         Surface(
             shape = RoundedCornerShape(24.dp),
-            color = Color(0xFF18181B),
-            border = BorderStroke(1.dp, Color(0xFF27272A)),
+            color = AppTheme.colors.surface,
+            border = BorderStroke(1.dp, AppTheme.colors.border),
             modifier = Modifier
                 .fillMaxWidth()
                 .fillMaxHeight(0.88f)
@@ -718,18 +792,18 @@ fun UkFoodSearchDialog(
                             "LOG FOOD & DRINKS",
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.Bold,
-                            color = Color(0xFFA1A1AA),
+                            color = AppTheme.colors.textMuted,
                             letterSpacing = 1.2.sp
                         )
                         Text(
                             "UK Supermarket Database & Barcodes",
                             style = MaterialTheme.typography.bodySmall,
-                            color = Color(0xFF60A5FA),
+                            color = AppTheme.colors.primary,
                             fontSize = 11.sp
                         )
                     }
                     IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
-                        Icon(Icons.Default.Close, contentDescription = "Close", tint = Color(0xFFA1A1AA))
+                        Icon(Icons.Default.Close, contentDescription = "Close", tint = AppTheme.colors.textMuted)
                     }
                 }
 
@@ -744,15 +818,15 @@ fun UkFoodSearchDialog(
                         val isSelected = selectedMeal.equals(meal, ignoreCase = true)
                         Surface(
                             shape = RoundedCornerShape(8.dp),
-                            color = if (isSelected) Color(0xFF3B82F6).copy(alpha = 0.25f) else Color(0xFF27272A),
-                            border = BorderStroke(1.dp, if (isSelected) Color(0xFF3B82F6) else Color(0xFF3F3F46)),
+                            color = if (isSelected) AppTheme.colors.primary.copy(alpha = 0.18f) else AppTheme.colors.surfaceElevated,
+                            border = BorderStroke(1.dp, if (isSelected) AppTheme.colors.primary else AppTheme.colors.border),
                             modifier = Modifier
                                 .weight(1f)
                                 .clickable { selectedMeal = meal }
                         ) {
                             Text(
                                 text = meal.take(4),
-                                color = if (isSelected) Color(0xFF60A5FA) else Color.White,
+                                color = if (isSelected) AppTheme.colors.primary else AppTheme.colors.textPrimary,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
                                 modifier = Modifier.padding(vertical = 6.dp, horizontal = 2.dp),
@@ -767,8 +841,8 @@ fun UkFoodSearchDialog(
                 // Tab Switcher (UK Database vs Custom Entry)
                 TabRow(
                     selectedTabIndex = activeTab,
-                    containerColor = Color(0xFF27272A),
-                    contentColor = Color(0xFF3B82F6),
+                    containerColor = AppTheme.colors.surfaceElevated,
+                    contentColor = AppTheme.colors.primary,
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(38.dp)
@@ -794,20 +868,22 @@ fun UkFoodSearchDialog(
                         onValueChange = { viewModel.onSearchQueryChanged(it) },
                         placeholder = { Text("Search Tesco, ASDA, Sainsbury's, Heinz...", fontSize = 13.sp) },
                         leadingIcon = {
-                            Icon(Icons.Default.Search, contentDescription = "Search", tint = Color(0xFFA1A1AA))
+                            Icon(Icons.Default.Search, contentDescription = "Search", tint = AppTheme.colors.textMuted)
                         },
                         trailingIcon = {
                             IconButton(onClick = { onScanBarcodeClicked(selectedMeal) }) {
-                                Icon(Icons.Default.QrCodeScanner, contentDescription = "Scan Barcode", tint = Color(0xFF60A5FA))
+                                Icon(Icons.Default.QrCodeScanner, contentDescription = "Scan Barcode", tint = AppTheme.colors.primary)
                             }
                         },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Color(0xFF3B82F6),
-                            unfocusedBorderColor = Color(0xFF27272A),
-                            focusedContainerColor = Color(0xFF27272A),
-                            unfocusedContainerColor = Color(0xFF27272A)
+                            focusedBorderColor = AppTheme.colors.primary,
+                            unfocusedBorderColor = AppTheme.colors.border,
+                            focusedContainerColor = AppTheme.colors.inputBackground,
+                            unfocusedContainerColor = AppTheme.colors.inputBackground,
+                            focusedTextColor = AppTheme.colors.textPrimary,
+                            unfocusedTextColor = AppTheme.colors.textPrimary
                         )
                     )
 
@@ -825,15 +901,15 @@ fun UkFoodSearchDialog(
                             val chipColor = getSupermarketBrandColor(market)
                             Surface(
                                 shape = RoundedCornerShape(50),
-                                color = if (isSelected) chipColor.copy(alpha = 0.25f) else Color(0xFF27272A),
-                                border = BorderStroke(1.dp, if (isSelected) chipColor else Color(0xFF3F3F46)),
+                                color = if (isSelected) chipColor.copy(alpha = 0.25f) else AppTheme.colors.surfaceElevated,
+                                border = BorderStroke(1.dp, if (isSelected) chipColor else AppTheme.colors.border),
                                 modifier = Modifier.clickable {
                                     viewModel.onSupermarketFilterChanged(market)
                                 }
                             ) {
                                 Text(
                                     text = market,
-                                    color = if (isSelected) chipColor else Color(0xFFA1A1AA),
+                                    color = if (isSelected) chipColor else AppTheme.colors.textSecondary,
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.SemiBold,
                                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
@@ -850,8 +926,8 @@ fun UkFoodSearchDialog(
                         val calculatedCalories = (item.caloriesPerServing * portionMultiplier).toInt()
                         Surface(
                             shape = RoundedCornerShape(16.dp),
-                            color = Color(0xFF27272A),
-                            border = BorderStroke(1.5.dp, Color(0xFF3B82F6)),
+                            color = AppTheme.colors.surfaceElevated,
+                            border = BorderStroke(1.5.dp, AppTheme.colors.primary),
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Column(modifier = Modifier.padding(14.dp)) {
@@ -864,12 +940,12 @@ fun UkFoodSearchDialog(
                                         Text(
                                             text = item.name,
                                             fontWeight = FontWeight.Bold,
-                                            color = Color.White,
+                                            color = AppTheme.colors.textPrimary,
                                             fontSize = 14.sp
                                         )
                                         Text(
                                             text = "${item.brandOrSupermarket} • ${item.servingSize}",
-                                            color = Color(0xFFA1A1AA),
+                                            color = AppTheme.colors.textSecondary,
                                             fontSize = 12.sp
                                         )
                                     }
@@ -877,13 +953,12 @@ fun UkFoodSearchDialog(
                                         onClick = { selectedItemForPortion = null },
                                         modifier = Modifier.size(24.dp)
                                     ) {
-                                        Icon(Icons.Default.Close, contentDescription = "Deselect", tint = Color(0xFFA1A1AA))
+                                        Icon(Icons.Default.Close, contentDescription = "Deselect", tint = AppTheme.colors.textMuted)
                                     }
                                 }
 
                                 Spacer(modifier = Modifier.height(10.dp))
 
-                                // Serving multiplier buttons
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -892,14 +967,15 @@ fun UkFoodSearchDialog(
                                         val isMultSelected = portionMultiplier == mult
                                         Surface(
                                             shape = RoundedCornerShape(8.dp),
-                                            color = if (isMultSelected) Color(0xFF3B82F6) else Color(0xFF18181B),
+                                            color = if (isMultSelected) AppTheme.colors.primary else AppTheme.colors.surface,
+                                            border = BorderStroke(1.dp, if (isMultSelected) AppTheme.colors.primary else AppTheme.colors.border),
                                             modifier = Modifier
                                                 .weight(1f)
                                                 .clickable { portionMultiplier = mult }
                                         ) {
                                             Text(
                                                 text = label,
-                                                color = Color.White,
+                                                color = if (isMultSelected) Color.White else AppTheme.colors.textPrimary,
                                                 fontSize = 12.sp,
                                                 fontWeight = FontWeight.Bold,
                                                 textAlign = TextAlign.Center,
@@ -918,7 +994,7 @@ fun UkFoodSearchDialog(
                                 ) {
                                     Text(
                                         text = "$calculatedCalories kcal",
-                                        color = Color(0xFF34D399),
+                                        color = AppTheme.colors.success,
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 18.sp
                                     )
@@ -927,10 +1003,10 @@ fun UkFoodSearchDialog(
                                             val servingDesc = if (portionMultiplier == 1.0f) item.servingSize else "${portionMultiplier}x ${item.servingSize}"
                                             onSave(item.name, servingDesc, calculatedCalories, selectedMeal, item.barcode)
                                         },
-                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3B82F6)),
+                                        colors = ButtonDefaults.buttonColors(containerColor = AppTheme.colors.primary),
                                         shape = RoundedCornerShape(10.dp)
                                     ) {
-                                        Text("Log to $selectedMeal", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                        Text("Log to $selectedMeal", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Color.White)
                                     }
                                 }
                             }
@@ -946,7 +1022,7 @@ fun UkFoodSearchDialog(
                                 .height(120.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            CircularProgressIndicator(color = Color(0xFF3B82F6), modifier = Modifier.size(24.dp))
+                            CircularProgressIndicator(color = AppTheme.colors.primary, modifier = Modifier.size(24.dp))
                         }
                     } else if (searchResults.isEmpty()) {
                         Box(
@@ -956,11 +1032,11 @@ fun UkFoodSearchDialog(
                             contentAlignment = Alignment.Center
                         ) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text("No UK items found matching query", color = Color(0xFF71717A), fontSize = 13.sp)
+                                Text("No UK items found matching query", color = AppTheme.colors.textMuted, fontSize = 13.sp)
                                 Spacer(modifier = Modifier.height(6.dp))
                                 Text(
                                     "Try switching to 'Custom Food' tab to add manually",
-                                    color = Color(0xFF60A5FA),
+                                    color = AppTheme.colors.primary,
                                     fontSize = 12.sp,
                                     modifier = Modifier.clickable { activeTab = 1 }
                                 )
@@ -998,10 +1074,12 @@ fun UkFoodSearchDialog(
                             placeholder = { Text("e.g. Homemade Chicken Stew") },
                             modifier = Modifier.fillMaxWidth(),
                             colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = Color(0xFF3B82F6),
-                                unfocusedBorderColor = Color(0xFF27272A),
-                                focusedContainerColor = Color(0xFF27272A),
-                                unfocusedContainerColor = Color(0xFF27272A)
+                                focusedBorderColor = AppTheme.colors.primary,
+                                unfocusedBorderColor = AppTheme.colors.border,
+                                focusedContainerColor = AppTheme.colors.inputBackground,
+                                unfocusedContainerColor = AppTheme.colors.inputBackground,
+                                focusedTextColor = AppTheme.colors.textPrimary,
+                                unfocusedTextColor = AppTheme.colors.textPrimary
                             )
                         )
 
@@ -1018,10 +1096,12 @@ fun UkFoodSearchDialog(
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                 modifier = Modifier.weight(1f),
                                 colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = Color(0xFF3B82F6),
-                                    unfocusedBorderColor = Color(0xFF27272A),
-                                    focusedContainerColor = Color(0xFF27272A),
-                                    unfocusedContainerColor = Color(0xFF27272A)
+                                    focusedBorderColor = AppTheme.colors.primary,
+                                    unfocusedBorderColor = AppTheme.colors.border,
+                                    focusedContainerColor = AppTheme.colors.inputBackground,
+                                    unfocusedContainerColor = AppTheme.colors.inputBackground,
+                                    focusedTextColor = AppTheme.colors.textPrimary,
+                                    unfocusedTextColor = AppTheme.colors.textPrimary
                                 )
                             )
 
@@ -1031,10 +1111,12 @@ fun UkFoodSearchDialog(
                                 label = { Text("Portion / Serving") },
                                 modifier = Modifier.weight(1f),
                                 colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = Color(0xFF3B82F6),
-                                    unfocusedBorderColor = Color(0xFF27272A),
-                                    focusedContainerColor = Color(0xFF27272A),
-                                    unfocusedContainerColor = Color(0xFF27272A)
+                                    focusedBorderColor = AppTheme.colors.primary,
+                                    unfocusedBorderColor = AppTheme.colors.border,
+                                    focusedContainerColor = AppTheme.colors.inputBackground,
+                                    unfocusedContainerColor = AppTheme.colors.inputBackground,
+                                    focusedTextColor = AppTheme.colors.textPrimary,
+                                    unfocusedTextColor = AppTheme.colors.textPrimary
                                 )
                             )
                         }
@@ -1051,9 +1133,9 @@ fun UkFoodSearchDialog(
                                 .fillMaxWidth()
                                 .height(48.dp),
                             shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3B82F6))
+                            colors = ButtonDefaults.buttonColors(containerColor = AppTheme.colors.primary)
                         ) {
-                            Text("Add Custom Food to $selectedMeal", fontWeight = FontWeight.Bold)
+                            Text("Add Custom Food to $selectedMeal", fontWeight = FontWeight.Bold, color = Color.White)
                         }
                     }
                 }
@@ -1070,8 +1152,8 @@ fun UkFoodResultItemRow(
     val brandColor = getSupermarketBrandColor(item.brandOrSupermarket)
     Surface(
         shape = RoundedCornerShape(12.dp),
-        color = Color(0xFF202024),
-        border = BorderStroke(1.dp, Color(0xFF2E2E33)),
+        color = AppTheme.colors.surfaceElevated,
+        border = BorderStroke(1.dp, AppTheme.colors.border),
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onSelect)
@@ -1103,7 +1185,7 @@ fun UkFoodResultItemRow(
                         Icon(
                             Icons.Default.QrCode,
                             contentDescription = "Barcode available",
-                            tint = Color(0xFF71717A),
+                            tint = AppTheme.colors.textMuted,
                             modifier = Modifier.size(13.dp)
                         )
                     }
@@ -1113,7 +1195,7 @@ fun UkFoodResultItemRow(
 
                 Text(
                     text = item.name,
-                    color = Color.White,
+                    color = AppTheme.colors.textPrimary,
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 13.sp,
                     maxLines = 2,
@@ -1122,7 +1204,7 @@ fun UkFoodResultItemRow(
 
                 Text(
                     text = "${item.servingSize} • ${item.caloriesPer100g} kcal/100g",
-                    color = Color(0xFFA1A1AA),
+                    color = AppTheme.colors.textMuted,
                     fontSize = 11.sp
                 )
             }
@@ -1132,13 +1214,13 @@ fun UkFoodResultItemRow(
             Column(horizontalAlignment = Alignment.End) {
                 Text(
                     text = "${item.caloriesPerServing} kcal",
-                    color = Color(0xFF34D399),
+                    color = AppTheme.colors.success,
                     fontWeight = FontWeight.Bold,
                     fontSize = 14.sp
                 )
                 Text(
                     text = "Tap to add",
-                    color = Color(0xFF60A5FA),
+                    color = AppTheme.colors.primary,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Medium
                 )
@@ -1161,7 +1243,6 @@ fun LogScannedProductDialog(
     var editableServing by remember { mutableStateOf(product.servingSize) }
     var editableCalories by remember { mutableStateOf(product.caloriesPerServing.toString()) }
     var selectedMeal by remember { mutableStateOf(initialMealType) }
-    var multiplier by remember { mutableStateOf(1.0f) }
 
     val brandColor = getSupermarketBrandColor(product.brandOrSupermarket)
     val isFound = product.name.isNotBlank()
@@ -1169,8 +1250,8 @@ fun LogScannedProductDialog(
     Dialog(onDismissRequest = onDismiss) {
         Surface(
             shape = RoundedCornerShape(22.dp),
-            color = Color(0xFF18181B),
-            border = BorderStroke(1.dp, Color(0xFF27272A)),
+            color = AppTheme.colors.surface,
+            border = BorderStroke(1.dp, AppTheme.colors.border),
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(modifier = Modifier.padding(20.dp)) {
@@ -1183,7 +1264,7 @@ fun LogScannedProductDialog(
                         Icon(
                             Icons.Default.QrCodeScanner,
                             contentDescription = null,
-                            tint = if (isFound) Color(0xFF34D399) else Color(0xFF60A5FA),
+                            tint = if (isFound) AppTheme.colors.success else AppTheme.colors.primary,
                             modifier = Modifier.size(20.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
@@ -1191,12 +1272,12 @@ fun LogScannedProductDialog(
                             text = if (isFound) "PRODUCT IDENTIFIED" else "NEW SCANNED PRODUCT",
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.Bold,
-                            color = if (isFound) Color(0xFF34D399) else Color(0xFF60A5FA),
+                            color = if (isFound) AppTheme.colors.success else AppTheme.colors.primary,
                             letterSpacing = 1.sp
                         )
                     }
                     IconButton(onClick = onDismiss, modifier = Modifier.size(24.dp)) {
-                        Icon(Icons.Default.Close, contentDescription = "Close", tint = Color(0xFFA1A1AA))
+                        Icon(Icons.Default.Close, contentDescription = "Close", tint = AppTheme.colors.textMuted)
                     }
                 }
 
@@ -1205,14 +1286,14 @@ fun LogScannedProductDialog(
                 // Status Banner
                 if (!isFound) {
                     Surface(
-                        color = Color(0xFF3B82F6).copy(alpha = 0.15f),
+                        color = AppTheme.colors.primary.copy(alpha = 0.15f),
                         shape = RoundedCornerShape(8.dp),
-                        border = BorderStroke(1.dp, Color(0xFF3B82F6).copy(alpha = 0.4f)),
+                        border = BorderStroke(1.dp, AppTheme.colors.primary.copy(alpha = 0.4f)),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(
                             text = "Barcode scanned! Enter product name and calories below to log.",
-                            color = Color(0xFF93C5FD),
+                            color = AppTheme.colors.primary,
                             fontSize = 12.sp,
                             modifier = Modifier.padding(8.dp)
                         )
@@ -1239,7 +1320,7 @@ fun LogScannedProductDialog(
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = "Barcode: ${product.barcode}",
-                            color = Color(0xFF71717A),
+                            color = AppTheme.colors.textMuted,
                             fontSize = 11.sp
                         )
                     }
@@ -1251,20 +1332,22 @@ fun LogScannedProductDialog(
                     value = editableName,
                     onValueChange = { editableName = it },
                     label = { Text("Product Name") },
-                    placeholder = { Text("e.g. Walkers Ready Salted, Tesco Meal Deal", color = Color(0xFF71717A)) },
+                    placeholder = { Text("e.g. Walkers Ready Salted, Tesco Meal Deal") },
                     modifier = Modifier.fillMaxWidth(),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Color(0xFF3B82F6),
-                        unfocusedBorderColor = Color(0xFF27272A),
-                        focusedContainerColor = Color(0xFF27272A),
-                        unfocusedContainerColor = Color(0xFF27272A)
+                        focusedBorderColor = AppTheme.colors.primary,
+                        unfocusedBorderColor = AppTheme.colors.border,
+                        focusedContainerColor = AppTheme.colors.inputBackground,
+                        unfocusedContainerColor = AppTheme.colors.inputBackground,
+                        focusedTextColor = AppTheme.colors.textPrimary,
+                        unfocusedTextColor = AppTheme.colors.textPrimary
                     )
                 )
 
                 Spacer(modifier = Modifier.height(10.dp))
 
                 // Meal category pills
-                Text("Log to Meal:", color = Color(0xFF71717A), fontSize = 12.sp)
+                Text("Log to Meal:", color = AppTheme.colors.textMuted, fontSize = 12.sp)
                 Spacer(modifier = Modifier.height(4.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -1274,15 +1357,15 @@ fun LogScannedProductDialog(
                         val isSelected = selectedMeal.equals(meal, ignoreCase = true)
                         Surface(
                             shape = RoundedCornerShape(8.dp),
-                            color = if (isSelected) Color(0xFF3B82F6).copy(alpha = 0.25f) else Color(0xFF27272A),
-                            border = BorderStroke(1.dp, if (isSelected) Color(0xFF3B82F6) else Color(0xFF3F3F46)),
+                            color = if (isSelected) AppTheme.colors.primary.copy(alpha = 0.20f) else AppTheme.colors.surfaceElevated,
+                            border = BorderStroke(1.dp, if (isSelected) AppTheme.colors.primary else AppTheme.colors.border),
                             modifier = Modifier
                                 .weight(1f)
                                 .clickable { selectedMeal = meal }
                         ) {
                             Text(
                                 text = meal.take(4),
-                                color = if (isSelected) Color(0xFF60A5FA) else Color.White,
+                                color = if (isSelected) AppTheme.colors.primary else AppTheme.colors.textPrimary,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
                                 modifier = Modifier.padding(vertical = 6.dp, horizontal = 2.dp),
@@ -1305,10 +1388,12 @@ fun LogScannedProductDialog(
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.weight(1f),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Color(0xFF3B82F6),
-                            unfocusedBorderColor = Color(0xFF27272A),
-                            focusedContainerColor = Color(0xFF27272A),
-                            unfocusedContainerColor = Color(0xFF27272A)
+                            focusedBorderColor = AppTheme.colors.primary,
+                            unfocusedBorderColor = AppTheme.colors.border,
+                            focusedContainerColor = AppTheme.colors.inputBackground,
+                            unfocusedContainerColor = AppTheme.colors.inputBackground,
+                            focusedTextColor = AppTheme.colors.textPrimary,
+                            unfocusedTextColor = AppTheme.colors.textPrimary
                         )
                     )
 
@@ -1318,10 +1403,12 @@ fun LogScannedProductDialog(
                         label = { Text("Portion") },
                         modifier = Modifier.weight(1f),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Color(0xFF3B82F6),
-                            unfocusedBorderColor = Color(0xFF27272A),
-                            focusedContainerColor = Color(0xFF27272A),
-                            unfocusedContainerColor = Color(0xFF27272A)
+                            focusedBorderColor = AppTheme.colors.primary,
+                            unfocusedBorderColor = AppTheme.colors.border,
+                            focusedContainerColor = AppTheme.colors.inputBackground,
+                            unfocusedContainerColor = AppTheme.colors.inputBackground,
+                            focusedTextColor = AppTheme.colors.textPrimary,
+                            unfocusedTextColor = AppTheme.colors.textPrimary
                         )
                     )
                 }
@@ -1338,31 +1425,14 @@ fun LogScannedProductDialog(
                         .fillMaxWidth()
                         .height(48.dp),
                     shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF34D399))
+                    colors = ButtonDefaults.buttonColors(containerColor = AppTheme.colors.success)
                 ) {
-                    Icon(Icons.Default.Check, contentDescription = null, tint = Color.Black)
+                    Icon(Icons.Default.Check, contentDescription = null, tint = Color.White)
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("Confirm & Log Scanned Food", color = Color.Black, fontWeight = FontWeight.Bold)
+                    Text("Confirm & Log Scanned Food", color = Color.White, fontWeight = FontWeight.Bold)
                 }
             }
         }
-    }
-}
-
-fun getSupermarketBrandColor(brand: String): Color {
-    return when {
-        brand.contains("Tesco", ignoreCase = true) -> Color(0xFF38BDF8) // Bright Cyan/Blue
-        brand.contains("Sainsbury", ignoreCase = true) -> Color(0xFFFB923C) // Orange
-        brand.contains("ASDA", ignoreCase = true) -> Color(0xFF4ADE80) // Green
-        brand.contains("M&S", ignoreCase = true) || brand.contains("Marks", ignoreCase = true) -> Color(0xFFFBBF24) // Gold
-        brand.contains("Morrisons", ignoreCase = true) -> Color(0xFFA3E635) // Lime Green
-        brand.contains("Aldi", ignoreCase = true) -> Color(0xFF60A5FA) // Blue
-        brand.contains("Lidl", ignoreCase = true) -> Color(0xFFF87171) // Red/Blue
-        brand.contains("Heinz", ignoreCase = true) -> Color(0xFF2DD4BF) // Teal
-        brand.contains("Warburtons", ignoreCase = true) -> Color(0xFFF472B6) // Pink
-        brand.contains("Cadbury", ignoreCase = true) -> Color(0xFFA78BFA) // Purple
-        brand.contains("Greggs", ignoreCase = true) -> Color(0xFF38BDF8) // Blue/Yellow
-        else -> Color(0xFF94A3B8)
     }
 }
 
@@ -1371,17 +1441,35 @@ fun EditCalorieGoalDialog(
     currentUseCustom: Boolean,
     currentCustomCalories: Int,
     calculatedBmr: Int,
+    latestWeightKg: Float,
+    heightCm: Float,
+    waistCm: Float?,
+    gender: String,
+    weightUnit: WeightUnit,
     onDismiss: () -> Unit,
     onSave: (Boolean, Int) -> Unit
 ) {
     var useCustom by remember { mutableStateOf(currentUseCustom) }
     var calorieInput by remember { mutableStateOf(currentCustomCalories.toString()) }
 
+    val activeCalories = if (useCustom) (calorieInput.toIntOrNull() ?: calculatedBmr) else calculatedBmr
+    val projection = remember(activeCalories, latestWeightKg, heightCm, waistCm, gender, weightUnit) {
+        CalorieWeightCalculator.calculateWeeklyProjection(
+            dailyBudget = activeCalories,
+            weightKg = latestWeightKg,
+            heightCm = heightCm,
+            waistCm = waistCm,
+            age = 30,
+            gender = gender,
+            unit = weightUnit
+        )
+    }
+
     Dialog(onDismissRequest = onDismiss) {
         Surface(
             shape = RoundedCornerShape(20.dp),
-            color = Color(0xFF18181B),
-            border = BorderStroke(1.dp, Color(0xFF27272A)),
+            color = AppTheme.colors.surface,
+            border = BorderStroke(1.dp, AppTheme.colors.border),
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(modifier = Modifier.padding(20.dp)) {
@@ -1389,7 +1477,7 @@ fun EditCalorieGoalDialog(
                     text = "SET DAILY CALORIE GOAL",
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Bold,
-                    color = Color(0xFFA1A1AA),
+                    color = AppTheme.colors.textMuted,
                     letterSpacing = 1.2.sp
                 )
                 Spacer(modifier = Modifier.height(14.dp))
@@ -1397,10 +1485,10 @@ fun EditCalorieGoalDialog(
                 // Mode 1: Auto BMR
                 Surface(
                     shape = RoundedCornerShape(12.dp),
-                    color = if (!useCustom) Color(0xFF3B82F6).copy(alpha = 0.18f) else Color(0xFF27272A),
+                    color = if (!useCustom) AppTheme.colors.primary.copy(alpha = 0.18f) else AppTheme.colors.surfaceElevated,
                     border = BorderStroke(
                         1.dp,
-                        if (!useCustom) Color(0xFF3B82F6) else Color(0xFF3F3F46)
+                        if (!useCustom) AppTheme.colors.primary else AppTheme.colors.border
                     ),
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1415,14 +1503,14 @@ fun EditCalorieGoalDialog(
                     ) {
                         Column {
                             Text(
-                                "Auto-Calculated BMR / TDEE",
-                                color = if (!useCustom) Color(0xFF60A5FA) else Color.White,
+                                "Auto-Calculated (BMR / TDEE)",
+                                color = if (!useCustom) AppTheme.colors.primary else AppTheme.colors.textPrimary,
                                 fontWeight = FontWeight.SemiBold,
                                 fontSize = 13.sp
                             )
                             Text(
                                 "$calculatedBmr kcal / day (Mifflin-St Jeor formula)",
-                                color = Color(0xFF71717A),
+                                color = AppTheme.colors.textMuted,
                                 fontSize = 11.sp
                             )
                         }
@@ -1430,8 +1518,8 @@ fun EditCalorieGoalDialog(
                             selected = !useCustom,
                             onClick = { useCustom = false },
                             colors = RadioButtonDefaults.colors(
-                                selectedColor = Color(0xFF3B82F6),
-                                unselectedColor = Color(0xFF71717A)
+                                selectedColor = AppTheme.colors.primary,
+                                unselectedColor = AppTheme.colors.textMuted
                             )
                         )
                     }
@@ -1442,10 +1530,10 @@ fun EditCalorieGoalDialog(
                 // Mode 2: Custom Daily Calories
                 Surface(
                     shape = RoundedCornerShape(12.dp),
-                    color = if (useCustom) Color(0xFF3B82F6).copy(alpha = 0.18f) else Color(0xFF27272A),
+                    color = if (useCustom) AppTheme.colors.primary.copy(alpha = 0.18f) else AppTheme.colors.surfaceElevated,
                     border = BorderStroke(
                         1.dp,
-                        if (useCustom) Color(0xFF3B82F6) else Color(0xFF3F3F46)
+                        if (useCustom) AppTheme.colors.primary else AppTheme.colors.border
                     ),
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1460,13 +1548,13 @@ fun EditCalorieGoalDialog(
                             Column {
                                 Text(
                                     "Custom Daily Target",
-                                    color = if (useCustom) Color(0xFF60A5FA) else Color.White,
+                                    color = if (useCustom) AppTheme.colors.primary else AppTheme.colors.textPrimary,
                                     fontWeight = FontWeight.SemiBold,
                                     fontSize = 13.sp
                                 )
                                 Text(
                                     "Manually define your daily calorie ceiling",
-                                    color = Color(0xFF71717A),
+                                    color = AppTheme.colors.textMuted,
                                     fontSize = 11.sp
                                 )
                             }
@@ -1474,8 +1562,8 @@ fun EditCalorieGoalDialog(
                                 selected = useCustom,
                                 onClick = { useCustom = true },
                                 colors = RadioButtonDefaults.colors(
-                                    selectedColor = Color(0xFF3B82F6),
-                                    unselectedColor = Color(0xFF71717A)
+                                    selectedColor = AppTheme.colors.primary,
+                                    unselectedColor = AppTheme.colors.textMuted
                                 )
                             )
                         }
@@ -1493,10 +1581,12 @@ fun EditCalorieGoalDialog(
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                 modifier = Modifier.fillMaxWidth(),
                                 colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = Color(0xFF3B82F6),
-                                    unfocusedBorderColor = Color(0xFF3F3F46),
-                                    focusedContainerColor = Color(0xFF27272A),
-                                    unfocusedContainerColor = Color(0xFF27272A)
+                                    focusedBorderColor = AppTheme.colors.primary,
+                                    unfocusedBorderColor = AppTheme.colors.border,
+                                    focusedContainerColor = AppTheme.colors.inputBackground,
+                                    unfocusedContainerColor = AppTheme.colors.inputBackground,
+                                    focusedTextColor = AppTheme.colors.textPrimary,
+                                    unfocusedTextColor = AppTheme.colors.textPrimary
                                 )
                             )
 
@@ -1509,7 +1599,8 @@ fun EditCalorieGoalDialog(
                                     val isSelected = calorieInput == preset.toString()
                                     Surface(
                                         shape = RoundedCornerShape(6.dp),
-                                        color = if (isSelected) Color(0xFF3B82F6) else Color(0xFF27272A),
+                                        color = if (isSelected) AppTheme.colors.primary else AppTheme.colors.surface,
+                                        border = BorderStroke(1.dp, if (isSelected) AppTheme.colors.primary else AppTheme.colors.border),
                                         modifier = Modifier
                                             .weight(1f)
                                             .clickable { calorieInput = preset.toString() }
@@ -1520,7 +1611,7 @@ fun EditCalorieGoalDialog(
                                         ) {
                                             Text(
                                                 text = "$preset",
-                                                color = if (isSelected) Color.White else Color(0xFFA1A1AA),
+                                                color = if (isSelected) Color.White else AppTheme.colors.textSecondary,
                                                 fontSize = 10.sp,
                                                 fontWeight = FontWeight.Bold
                                             )
@@ -1532,14 +1623,57 @@ fun EditCalorieGoalDialog(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Live Weight Loss Projection Preview
+                val bannerColor = when (projection.trajectory) {
+                    WeightTrajectory.WEIGHT_LOSS -> AppTheme.colors.success
+                    WeightTrajectory.WEIGHT_GAIN -> AppTheme.colors.warning
+                    WeightTrajectory.MAINTENANCE -> AppTheme.colors.primary
+                }
+
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = bannerColor.copy(alpha = if (AppTheme.colors.isDark) 0.15f else 0.10f),
+                    border = BorderStroke(1.dp, bannerColor.copy(alpha = 0.35f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(10.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "PROJECTED CHANGE:",
+                                color = bannerColor,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 11.sp
+                            )
+                            Text(
+                                text = projection.summaryText,
+                                color = bannerColor,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "Daily deficit: ${projection.dailyDeficit} kcal vs estimated TDEE (${projection.tdee} kcal/day).",
+                            color = AppTheme.colors.textSecondary,
+                            fontSize = 11.sp
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.End
                 ) {
                     TextButton(onClick = onDismiss) {
-                        Text("Cancel", color = Color(0xFFA1A1AA))
+                        Text("Cancel", color = AppTheme.colors.textMuted)
                     }
                     Spacer(modifier = Modifier.width(8.dp))
                     Button(
@@ -1547,10 +1681,10 @@ fun EditCalorieGoalDialog(
                             val parsed = calorieInput.toIntOrNull() ?: 2000
                             onSave(useCustom, if (parsed > 0) parsed else 2000)
                         },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3B82F6)),
+                        colors = ButtonDefaults.buttonColors(containerColor = AppTheme.colors.primary),
                         shape = RoundedCornerShape(10.dp)
                     ) {
-                        Text("Save Goal", fontWeight = FontWeight.Bold)
+                        Text("Save Goal", fontWeight = FontWeight.Bold, color = Color.White)
                     }
                 }
             }

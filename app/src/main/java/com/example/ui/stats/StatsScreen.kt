@@ -2,16 +2,10 @@ package com.example.ui.stats
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.TrendingDown
-import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -19,15 +13,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.*
-import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.data.local.entity.FastSession
-import com.example.data.local.entity.FoodEntry
-import com.example.data.local.entity.WeightEntry
 import com.example.data.repository.UserPreferences
 import com.example.data.repository.WeightUnit
 import com.example.ui.components.AvatarPickerDialog
@@ -35,6 +25,7 @@ import com.example.ui.components.UserAvatarView
 import com.example.ui.fasting.FastingViewModel
 import com.example.ui.food.FoodViewModel
 import com.example.ui.settings.SettingsViewModel
+import com.example.ui.theme.AppTheme
 import com.example.ui.weight.WeightViewModel
 import com.example.util.WeightUtils
 import java.text.SimpleDateFormat
@@ -68,6 +59,7 @@ fun StatsScreen(
     val weightUnit = userPrefs?.weightUnit ?: WeightUnit.KG
     val heightCm = userPrefs?.heightCm ?: 170f
     val gender = userPrefs?.gender ?: "Male"
+    val waistCm = userPrefs?.waistCm
 
     val calendar = Calendar.getInstance()
     val greeting = when (calendar.get(Calendar.HOUR_OF_DAY)) {
@@ -110,7 +102,7 @@ fun StatsScreen(
     val currentBmi = weightViewModel.calculateBmi(latestWeight, heightCm)
 
     // Calories stats calculation
-    val dailyBudget = weightViewModel.calculateDailyCalories(latestWeight, heightCm, 30, gender)
+    val dailyBudget = weightViewModel.calculateDailyCalories(latestWeight, heightCm, 30, gender, waistCm)
     val totalCalories = filteredFoods.sumOf { it.calories }
     val uniqueDaysWithFood = filteredFoods.map {
         val cal = Calendar.getInstance().apply { timeInMillis = it.date }
@@ -140,7 +132,7 @@ fun StatsScreen(
                     val dateFormat = SimpleDateFormat("dd-MM-yyyy", Locale.UK)
                     Text(
                         text = dateFormat.format(Date()),
-                        color = Color(0xFFA1A1AA),
+                        color = AppTheme.colors.textMuted,
                         style = MaterialTheme.typography.bodySmall,
                         fontWeight = FontWeight.Medium
                     )
@@ -148,19 +140,19 @@ fun StatsScreen(
                         text = "$greeting, $username",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
-                        color = Color.White
+                        color = AppTheme.colors.textPrimary
                     )
                 }
             }
 
             Surface(
                 shape = RoundedCornerShape(50),
-                color = Color(0xFF18181B),
-                border = BorderStroke(1.dp, Color(0xFF27272A))
+                color = AppTheme.colors.surfaceElevated,
+                border = BorderStroke(1.dp, AppTheme.colors.border)
             ) {
                 Text(
                     text = "INSIGHTS",
-                    color = Color(0xFF34D399),
+                    color = AppTheme.colors.success,
                     fontWeight = FontWeight.Bold,
                     fontSize = 11.sp,
                     letterSpacing = 1.sp,
@@ -180,15 +172,15 @@ fun StatsScreen(
                 val isSelected = selectedRange == range
                 Surface(
                     shape = RoundedCornerShape(10.dp),
-                    color = if (isSelected) Color(0xFF3B82F6).copy(alpha = 0.2f) else Color(0xFF18181B),
-                    border = BorderStroke(1.dp, if (isSelected) Color(0xFF3B82F6) else Color(0xFF27272A)),
+                    color = if (isSelected) AppTheme.colors.primary.copy(alpha = 0.2f) else AppTheme.colors.surfaceElevated,
+                    border = BorderStroke(1.dp, if (isSelected) AppTheme.colors.primary else AppTheme.colors.border),
                     modifier = Modifier
                         .weight(1f)
                         .clickable { selectedRange = range }
                 ) {
                     Text(
                         text = range.label,
-                        color = if (isSelected) Color(0xFF60A5FA) else Color(0xFFA1A1AA),
+                        color = if (isSelected) AppTheme.colors.primary else AppTheme.colors.textSecondary,
                         fontSize = 12.sp,
                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                         textAlign = androidx.compose.ui.text.style.TextAlign.Center,
@@ -227,7 +219,7 @@ fun StatsScreen(
                             label = "SUCCESS RATE",
                             value = "$successRate%",
                             sub = "$hitGoalFasts of $totalFasts on target",
-                            highlightColor = if (successRate >= 80) Color(0xFF34D399) else Color(0xFF60A5FA),
+                            highlightColor = if (successRate >= 80) AppTheme.colors.success else AppTheme.colors.primary,
                             modifier = Modifier.weight(1f)
                         )
                         StatTile(
@@ -240,7 +232,7 @@ fun StatsScreen(
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    Text("FASTING DURATION HISTORY (HOURS)", style = MaterialTheme.typography.labelSmall, color = Color(0xFFA1A1AA), fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp)
+                    Text("FASTING DURATION HISTORY (HOURS)", style = MaterialTheme.typography.labelSmall, color = AppTheme.colors.textMuted, fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp)
                     Spacer(modifier = Modifier.height(8.dp))
 
                     // Fasting Interactive Bar Chart
@@ -273,7 +265,7 @@ fun StatsScreen(
                             modifier = Modifier.weight(1f)
                         )
                         val changeSign = if (weightChangeKg <= 0) "" else "+"
-                        val changeColor = if (weightChangeKg <= 0) Color(0xFF34D399) else Color(0xFFF87171)
+                        val changeColor = if (weightChangeKg <= 0) AppTheme.colors.success else AppTheme.colors.danger
                         StatTile(
                             label = "NET CHANGE",
                             value = "$changeSign${WeightUtils.formatWeight(kotlin.math.abs(weightChangeKg), weightUnit)}",
@@ -291,7 +283,7 @@ fun StatsScreen(
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    Text("WEIGHT TREND TRAJECTORY", style = MaterialTheme.typography.labelSmall, color = Color(0xFFA1A1AA), fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp)
+                    Text("WEIGHT TREND TRAJECTORY", style = MaterialTheme.typography.labelSmall, color = AppTheme.colors.textMuted, fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp)
                     Spacer(modifier = Modifier.height(8.dp))
 
                     val weightDataPoints = if (filteredWeights.isNotEmpty()) {
@@ -332,11 +324,10 @@ fun StatsScreen(
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    Text("DAILY CALORIE INTAKE VS BUDGET", style = MaterialTheme.typography.labelSmall, color = Color(0xFFA1A1AA), fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp)
+                    Text("DAILY CALORIE INTAKE VS BUDGET", style = MaterialTheme.typography.labelSmall, color = AppTheme.colors.textMuted, fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp)
                     Spacer(modifier = Modifier.height(8.dp))
 
                     val calDataPoints = if (filteredFoods.isNotEmpty()) {
-                        // Aggregate by recent logs
                         filteredFoods.take(10).reversed().map { it.calories.toFloat() }
                     } else {
                         listOf(2100f, 1950f, 2200f, 1800f, 2050f, 1900f, 1980f)
@@ -352,7 +343,7 @@ fun StatsScreen(
                     Spacer(modifier = Modifier.height(14.dp))
 
                     // Meal Type Breakdown Pills
-                    Text("MEAL TYPE DISTRIBUTION", style = MaterialTheme.typography.labelSmall, color = Color(0xFF71717A), fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp)
+                    Text("MEAL TYPE DISTRIBUTION", style = MaterialTheme.typography.labelSmall, color = AppTheme.colors.textMuted, fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp)
                     Spacer(modifier = Modifier.height(6.dp))
 
                     val breakfastCal = filteredFoods.filter { it.mealType.equals("Breakfast", true) }.sumOf { it.calories }
@@ -366,8 +357,8 @@ fun StatsScreen(
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         MealDistributionChip("🍳 Brk", breakfastCal, Color(0xFFFB923C), Modifier.weight(1f))
-                        MealDistributionChip("🥗 Lun", lunchCal, Color(0xFF34D399), Modifier.weight(1f))
-                        MealDistributionChip("🍲 Din", dinnerCal, Color(0xFF60A5FA), Modifier.weight(1f))
+                        MealDistributionChip("🥗 Lun", lunchCal, AppTheme.colors.success, Modifier.weight(1f))
+                        MealDistributionChip("🍲 Din", dinnerCal, AppTheme.colors.primary, Modifier.weight(1f))
                         MealDistributionChip("🥨 Snk", snacksCal, Color(0xFFA78BFA), Modifier.weight(1f))
                         MealDistributionChip("💧 Drk", drinksCal, Color(0xFF38BDF8), Modifier.weight(1f))
                     }
@@ -390,8 +381,8 @@ fun SectionCard(
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF18181B)),
-        border = BorderStroke(1.dp, Color(0xFF27272A))
+        colors = CardDefaults.cardColors(containerColor = AppTheme.colors.surface),
+        border = BorderStroke(1.dp, AppTheme.colors.border)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -402,7 +393,7 @@ fun SectionCard(
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 1.2.sp,
-                    color = Color(0xFFA1A1AA)
+                    color = AppTheme.colors.textMuted
                 )
             }
             Spacer(modifier = Modifier.height(14.dp))
@@ -416,20 +407,20 @@ fun StatTile(
     label: String,
     value: String,
     sub: String,
-    highlightColor: Color = Color.White,
+    highlightColor: Color = AppTheme.colors.textPrimary,
     modifier: Modifier = Modifier
 ) {
     Surface(
         shape = RoundedCornerShape(12.dp),
-        color = Color(0xFF27272A).copy(alpha = 0.5f),
-        border = BorderStroke(1.dp, Color(0xFF3F3F46).copy(alpha = 0.4f)),
+        color = AppTheme.colors.surfaceElevated,
+        border = BorderStroke(1.dp, AppTheme.colors.border),
         modifier = modifier
     ) {
         Column(modifier = Modifier.padding(10.dp)) {
-            Text(label, color = Color(0xFF71717A), fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp)
+            Text(label, color = AppTheme.colors.textMuted, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp)
             Spacer(modifier = Modifier.height(2.dp))
             Text(value, color = highlightColor, fontWeight = FontWeight.Bold, fontSize = 15.sp, maxLines = 1)
-            Text(sub, color = Color(0xFFA1A1AA), fontSize = 10.sp, maxLines = 1)
+            Text(sub, color = AppTheme.colors.textSecondary, fontSize = 10.sp, maxLines = 1)
         }
     }
 }
@@ -438,8 +429,8 @@ fun StatTile(
 fun MealDistributionChip(label: String, calories: Int, color: Color, modifier: Modifier = Modifier) {
     Surface(
         shape = RoundedCornerShape(8.dp),
-        color = color.copy(alpha = 0.12f),
-        border = BorderStroke(1.dp, color.copy(alpha = 0.3f)),
+        color = color.copy(alpha = if (AppTheme.colors.isDark) 0.15f else 0.12f),
+        border = BorderStroke(1.dp, color.copy(alpha = 0.35f)),
         modifier = modifier
     ) {
         Column(
@@ -447,7 +438,7 @@ fun MealDistributionChip(label: String, calories: Int, color: Color, modifier: M
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(label, color = color, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-            Text("${calories}k", color = Color.White, fontSize = 9.sp)
+            Text("${calories}k", color = AppTheme.colors.textPrimary, fontSize = 9.sp)
         }
     }
 }
@@ -458,6 +449,10 @@ fun FastingBarChart(
     targetLine: Float = 16f,
     modifier: Modifier = Modifier
 ) {
+    val borderColor = AppTheme.colors.border
+    val successCol = AppTheme.colors.success
+    val primCol = AppTheme.colors.primary
+
     Canvas(modifier = modifier) {
         val width = size.width
         val height = size.height
@@ -471,7 +466,7 @@ fun FastingBarChart(
         // Draw target dashed guideline
         val targetY = height - (targetLine / maxVal) * height
         drawLine(
-            color = Color(0xFF3F3F46),
+            color = borderColor,
             start = Offset(0f, targetY),
             end = Offset(width, targetY),
             strokeWidth = 2f,
@@ -486,15 +481,14 @@ fun FastingBarChart(
 
             val brush = Brush.verticalGradient(
                 colors = if (reachedGoal) {
-                    listOf(Color(0xFF34D399), Color(0xFF059669))
+                    listOf(successCol, successCol.copy(alpha = 0.7f))
                 } else {
-                    listOf(Color(0xFF60A5FA), Color(0xFF2563EB))
+                    listOf(primCol, primCol.copy(alpha = 0.7f))
                 },
                 startY = y,
                 endY = height
             )
 
-            // Draw rounded bar
             drawRoundRect(
                 brush = brush,
                 topLeft = Offset(x, y),
@@ -511,6 +505,9 @@ fun WeightLineChart(
     unit: WeightUnit,
     modifier: Modifier = Modifier
 ) {
+    val primCol = AppTheme.colors.primary
+    val surfaceCol = AppTheme.colors.surface
+
     Canvas(modifier = modifier) {
         val width = size.width
         val height = size.height
@@ -543,7 +540,7 @@ fun WeightLineChart(
         drawPath(
             path = fillPath,
             brush = Brush.verticalGradient(
-                colors = listOf(Color(0xFF3B82F6).copy(alpha = 0.35f), Color.Transparent),
+                colors = listOf(primCol.copy(alpha = 0.35f), Color.Transparent),
                 startY = 0f,
                 endY = height
             )
@@ -562,19 +559,19 @@ fun WeightLineChart(
 
         drawPath(
             path = linePath,
-            color = Color(0xFF60A5FA),
+            color = primCol,
             style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round)
         )
 
         // Draw points
         points.forEach { pt ->
             drawCircle(
-                color = Color(0xFF18181B),
+                color = surfaceCol,
                 radius = 5.dp.toPx(),
                 center = pt
             )
             drawCircle(
-                color = Color(0xFF60A5FA),
+                color = primCol,
                 radius = 3.dp.toPx(),
                 center = pt
             )
@@ -588,6 +585,9 @@ fun CalorieIntakeChart(
     targetBudget: Float = 2150f,
     modifier: Modifier = Modifier
 ) {
+    val successCol = AppTheme.colors.success
+    val dangerCol = AppTheme.colors.danger
+
     Canvas(modifier = modifier) {
         val width = size.width
         val height = size.height
@@ -601,7 +601,7 @@ fun CalorieIntakeChart(
         // Budget line
         val budgetY = height - (targetBudget / maxVal) * height
         drawLine(
-            color = Color(0xFF34D399).copy(alpha = 0.6f),
+            color = successCol.copy(alpha = 0.6f),
             start = Offset(0f, budgetY),
             end = Offset(width, budgetY),
             strokeWidth = 2f,
@@ -616,9 +616,9 @@ fun CalorieIntakeChart(
 
             val brush = Brush.verticalGradient(
                 colors = if (overBudget) {
-                    listOf(Color(0xFFF87171), Color(0xFFEF4444))
+                    listOf(dangerCol, dangerCol.copy(alpha = 0.7f))
                 } else {
-                    listOf(Color(0xFF34D399), Color(0xFF059669))
+                    listOf(successCol, successCol.copy(alpha = 0.7f))
                 },
                 startY = y,
                 endY = height

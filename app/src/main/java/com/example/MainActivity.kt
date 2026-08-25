@@ -4,6 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -11,6 +12,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.data.repository.ThemeMode
 import com.example.data.repository.UserPreferences
 import com.example.data.repository.WeightUnit
 import com.example.ui.MainScreen
@@ -31,13 +33,21 @@ class MainActivity : ComponentActivity() {
                 gender = "Male",
                 weightUnit = WeightUnit.KG,
                 useImperial = false,
+                themeMode = ThemeMode.DARK,
                 useDarkTheme = true,
                 soundsEnabled = true,
                 avatarId = "icon:🔥"
             )
 
+            val isSystemDark = isSystemInDarkTheme()
+            val isDarkTheme = when (activePrefs.themeMode) {
+                ThemeMode.DARK -> true
+                ThemeMode.LIGHT -> false
+                ThemeMode.SYSTEM -> isSystemDark
+            }
+
             MyApplicationTheme(
-                darkTheme = activePrefs.useDarkTheme
+                darkTheme = isDarkTheme
             ) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
@@ -49,4 +59,3 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
-

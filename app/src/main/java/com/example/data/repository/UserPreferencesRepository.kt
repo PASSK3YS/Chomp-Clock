@@ -25,6 +25,36 @@ enum class WeightUnit(val displayName: String, val shortName: String) {
     }
 }
 
+enum class HeightUnit(val displayName: String, val shortName: String) {
+    CM("Centimeters", "cm"),
+    FT_IN("Feet & Inches", "ft/in");
+
+    companion object {
+        fun fromString(value: String?): HeightUnit {
+            return when (value?.uppercase()) {
+                "FT_IN", "FEET_INCHES", "IMPERIAL" -> FT_IN
+                else -> CM
+            }
+        }
+    }
+}
+
+enum class ThemeMode(val displayName: String, val description: String) {
+    DARK("Dark Mode", "High contrast AMOLED dark styling"),
+    LIGHT("Light Mode", "Crisp, bright & high readability styling"),
+    SYSTEM("System Default", "Follows device system appearance");
+
+    companion object {
+        fun fromString(value: String?): ThemeMode {
+            return when (value?.uppercase()) {
+                "LIGHT" -> LIGHT
+                "SYSTEM" -> SYSTEM
+                else -> DARK
+            }
+        }
+    }
+}
+
 class UserPreferencesRepository(private val context: Context) {
 
     private val dataStore = context.dataStore
@@ -33,11 +63,22 @@ class UserPreferencesRepository(private val context: Context) {
         .map { preferences ->
             val username = preferences[USERNAME] ?: "User"
             val heightCm = preferences[HEIGHT_CM] ?: 170f
+            val waistCm = preferences[WAIST_CM]
             val gender = preferences[GENDER] ?: "Male"
             val weightUnitStr = preferences[WEIGHT_UNIT] ?: "KG"
             val weightUnit = WeightUnit.fromString(weightUnitStr)
+            val heightUnitStr = preferences[HEIGHT_UNIT] ?: if (weightUnit != WeightUnit.KG) "FT_IN" else "CM"
+            val heightUnit = HeightUnit.fromString(heightUnitStr)
             val useImperial = preferences[USE_IMPERIAL] ?: (weightUnit != WeightUnit.KG)
-            val useDarkTheme = preferences[USE_DARK_THEME] ?: true
+            
+            val themeModeStr = preferences[THEME_MODE]
+            val themeMode = if (themeModeStr != null) {
+                ThemeMode.fromString(themeModeStr)
+            } else {
+                val oldDark = preferences[USE_DARK_THEME] ?: true
+                if (oldDark) ThemeMode.DARK else ThemeMode.LIGHT
+            }
+
             val soundsEnabled = preferences[SOUNDS_ENABLED] ?: true
             val profilePicUri = preferences[PROFILE_PIC_URI]
             val avatarId = preferences[AVATAR_ID] ?: "icon:🔥"
@@ -47,10 +88,13 @@ class UserPreferencesRepository(private val context: Context) {
             UserPreferences(
                 username = username,
                 heightCm = heightCm,
+                waistCm = waistCm,
                 gender = gender,
                 weightUnit = weightUnit,
+                heightUnit = heightUnit,
                 useImperial = useImperial,
-                useDarkTheme = useDarkTheme,
+                themeMode = themeMode,
+                useDarkTheme = (themeMode == ThemeMode.DARK),
                 soundsEnabled = soundsEnabled,
                 profilePicUri = profilePicUri,
                 avatarId = avatarId,
@@ -65,6 +109,20 @@ class UserPreferencesRepository(private val context: Context) {
 
     suspend fun updateHeight(heightCm: Float) {
         dataStore.edit { it[HEIGHT_CM] = heightCm }
+    }
+
+    suspend fun updateWaist(waistCm: Float?) {
+        dataStore.edit { 
+            if (waistCm != null && waistCm > 0f) {
+                it[WAIST_CM] = waistCm
+            } else {
+                it.remove(WAIST_CM)
+            }
+        }
+    }
+
+    suspend fun updateHeightUnit(unit: HeightUnit) {
+        dataStore.edit { it[HEIGHT_UNIT] = unit.name }
     }
 
     suspend fun updateGender(gender: String) {
@@ -86,6 +144,13 @@ class UserPreferencesRepository(private val context: Context) {
         }
     }
 
+    suspend fun updateThemeMode(themeMode: ThemeMode) {
+        dataStore.edit { 
+            it[THEME_MODE] = themeMode.name
+            it[USE_DARK_THEME] = (themeMode == ThemeMode.DARK)
+        }
+    }
+
     suspend fun updateUseImperial(useImperial: Boolean) {
         dataStore.edit { 
             it[USE_IMPERIAL] = useImperial
@@ -98,7 +163,7 @@ class UserPreferencesRepository(private val context: Context) {
     }
     
     suspend fun updateUseDarkTheme(useDarkTheme: Boolean) {
-        dataStore.edit { it[USE_DARK_THEME] = useDarkTheme }
+        updateThemeMode(if (useDarkTheme) ThemeMode.DARK else ThemeMode.LIGHT)
     }
     
     suspend fun updateSoundsEnabled(soundsEnabled: Boolean) {
@@ -134,10 +199,13 @@ class UserPreferencesRepository(private val context: Context) {
     companion object {
         val USERNAME = stringPreferencesKey("username")
         val HEIGHT_CM = floatPreferencesKey("height_cm")
+        val WAIST_CM = floatPreferencesKey("waist_cm")
         val GENDER = stringPreferencesKey("gender")
         val WEIGHT_UNIT = stringPreferencesKey("weight_unit")
+        val HEIGHT_UNIT = stringPreferencesKey("height_unit")
         val USE_IMPERIAL = booleanPreferencesKey("use_imperial")
         val USE_DARK_THEME = booleanPreferencesKey("use_dark_theme")
+        val THEME_MODE = stringPreferencesKey("theme_mode")
         val SOUNDS_ENABLED = booleanPreferencesKey("sounds_enabled")
         val PROFILE_PIC_URI = stringPreferencesKey("profile_pic_uri")
         val AVATAR_ID = stringPreferencesKey("avatar_id")
@@ -149,9 +217,12 @@ class UserPreferencesRepository(private val context: Context) {
 data class UserPreferences(
     val username: String,
     val heightCm: Float,
+    val waistCm: Float? = null,
     val gender: String, // "Male" or "Female"
     val weightUnit: WeightUnit = WeightUnit.KG,
+    val heightUnit: HeightUnit = HeightUnit.CM,
     val useImperial: Boolean = false,
+    val themeMode: ThemeMode = ThemeMode.DARK,
     val useDarkTheme: Boolean = true,
     val soundsEnabled: Boolean = true,
     val profilePicUri: String? = null,

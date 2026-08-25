@@ -20,6 +20,7 @@ import com.example.ui.fasting.FastingScreen
 import com.example.ui.food.FoodScreen
 import com.example.ui.settings.SettingsScreen
 import com.example.ui.stats.StatsScreen
+import com.example.ui.theme.AppTheme
 import com.example.ui.weight.WeightScreen
 
 @Composable
@@ -29,6 +30,7 @@ fun MainScreen(
     val navController = rememberNavController()
     
     Scaffold(
+        containerColor = AppTheme.colors.background,
         bottomBar = { BottomNavigationBar(navController = navController) }
     ) { innerPadding ->
         NavHost(
@@ -66,21 +68,22 @@ fun BottomNavigationBar(navController: NavHostController) {
     )
 
     Surface(
-        color = Color(0xFF0A0A0A),
-        shadowElevation = 8.dp,
-        border = BorderStroke(1.dp, Color(0xFF18181B))
+        color = AppTheme.colors.surface,
+        shadowElevation = if (AppTheme.colors.isDark) 8.dp else 4.dp,
+        border = BorderStroke(1.dp, AppTheme.colors.border)
     ) {
         NavigationBar(
             containerColor = Color.Transparent,
-            contentColor = Color(0xFFA1A1AA)
+            contentColor = AppTheme.colors.textSecondary
         ) {
             val navBackStackEntry by navController.currentBackStackEntryAsState()
             val currentRoute = navBackStackEntry?.destination?.route
             items.forEach { item ->
+                val isSelected = currentRoute == item.route
                 NavigationBarItem(
                     icon = { Icon(item.icon, contentDescription = item.title) },
                     label = { Text(item.title, style = MaterialTheme.typography.labelSmall) },
-                    selected = currentRoute == item.route,
+                    selected = isSelected,
                     onClick = {
                         navController.navigate(item.route) {
                             navController.graph.startDestinationRoute?.let { route ->
@@ -91,11 +94,11 @@ fun BottomNavigationBar(navController: NavHostController) {
                         }
                     },
                     colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = Color(0xFF60A5FA),
-                        selectedTextColor = Color(0xFF60A5FA),
-                        indicatorColor = Color.Transparent,
-                        unselectedIconColor = Color(0xFF71717A),
-                        unselectedTextColor = Color(0xFF71717A)
+                        selectedIconColor = AppTheme.colors.primary,
+                        selectedTextColor = AppTheme.colors.primary,
+                        indicatorColor = AppTheme.colors.primary.copy(alpha = if (AppTheme.colors.isDark) 0.18f else 0.12f),
+                        unselectedIconColor = AppTheme.colors.textMuted,
+                        unselectedTextColor = AppTheme.colors.textMuted
                     )
                 )
             }
