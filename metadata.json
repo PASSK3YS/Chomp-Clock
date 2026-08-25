@@ -1,0 +1,6 @@
+{
+  "name": "Chomp Clock",
+  "description": "A comprehensive weight loss app with fasting tracking, weight logging, and barcode food logging features.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
