@@ -8,18 +8,20 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import com.example.data.local.dao.AchievementDao
 import com.example.data.local.dao.FastSessionDao
 import com.example.data.local.dao.FoodEntryDao
+import com.example.data.local.dao.SavedFoodItemDao
 import com.example.data.local.dao.WeightEntryDao
 import com.example.data.local.entity.Achievement
 import com.example.data.local.entity.FastSession
 import com.example.data.local.entity.FoodEntry
+import com.example.data.local.entity.SavedFoodItem
 import com.example.data.local.entity.WeightEntry
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 @Database(
-    entities = [FastSession::class, WeightEntry::class, FoodEntry::class, Achievement::class],
-    version = 2,
+    entities = [FastSession::class, WeightEntry::class, FoodEntry::class, Achievement::class, SavedFoodItem::class],
+    version = 3,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -27,6 +29,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun weightEntryDao(): WeightEntryDao
     abstract fun foodEntryDao(): FoodEntryDao
     abstract fun achievementDao(): AchievementDao
+    abstract fun savedFoodItemDao(): SavedFoodItemDao
 
     companion object {
         @Volatile

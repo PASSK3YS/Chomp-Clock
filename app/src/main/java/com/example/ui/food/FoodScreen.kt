@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.data.local.entity.FoodEntry
+import com.example.data.local.entity.SavedFoodItem
 import com.example.data.repository.FoodSearchResult
 import com.example.data.repository.HeightUnit
 import com.example.data.repository.UserPreferences
@@ -200,11 +201,20 @@ fun FoodScreen(
                 scannedProductToConfirm = null
                 viewModel.clearBarcodeState()
             },
-            onConfirm = { name, serving, calories, mealType, barcode ->
-                viewModel.addFoodEntry(name, serving, calories, mealType, barcode)
+            onConfirm = { name, serving, calories, mealType, barcode, brand, saveForFuture ->
+                viewModel.addFoodEntry(
+                    name = name,
+                    servingSize = serving,
+                    calories = calories,
+                    mealType = mealType,
+                    barcode = barcode,
+                    brandOrSupermarket = brand,
+                    saveForFuture = saveForFuture
+                )
                 scannedProductToConfirm = null
                 viewModel.clearBarcodeState()
-                Toast.makeText(context, "Logged: $name ($calories kcal)", Toast.LENGTH_SHORT).show()
+                val saveNotice = if (saveForFuture) " (Saved to My Foods ⭐)" else ""
+                Toast.makeText(context, "Logged: $name ($calories kcal)$saveNotice", Toast.LENGTH_SHORT).show()
             }
         )
     } else if (scannedFallbackBarcode != null) {
@@ -213,7 +223,7 @@ fun FoodScreen(
             product = FoodSearchResult(
                 id = code,
                 name = "",
-                brandOrSupermarket = "Unlisted UK Item",
+                brandOrSupermarket = "Scanned Item",
                 category = "Scanned Food",
                 caloriesPerServing = 150,
                 servingSize = "1 serving (100g)",
@@ -226,11 +236,20 @@ fun FoodScreen(
                 scannedFallbackBarcode = null
                 viewModel.clearBarcodeState()
             },
-            onConfirm = { name, serving, calories, mealType, barcode ->
-                viewModel.addFoodEntry(name, serving, calories, mealType, barcode)
+            onConfirm = { name, serving, calories, mealType, barcode, brand, saveForFuture ->
+                viewModel.addFoodEntry(
+                    name = name,
+                    servingSize = serving,
+                    calories = calories,
+                    mealType = mealType,
+                    barcode = barcode,
+                    brandOrSupermarket = brand,
+                    saveForFuture = saveForFuture
+                )
                 scannedFallbackBarcode = null
                 viewModel.clearBarcodeState()
-                Toast.makeText(context, "Logged: $name ($calories kcal)", Toast.LENGTH_SHORT).show()
+                val saveNotice = if (saveForFuture) " (Saved to My Foods ⭐)" else ""
+                Toast.makeText(context, "Logged: $name ($calories kcal)$saveNotice", Toast.LENGTH_SHORT).show()
             }
         )
     }
@@ -246,10 +265,19 @@ fun FoodScreen(
                 showFoodSearchDialog = false
                 showScanner = true
             },
-            onSave = { name, serving, calories, mealType, barcode ->
-                viewModel.addFoodEntry(name, serving, calories, mealType, barcode)
+            onSave = { name, serving, calories, mealType, barcode, brand, saveForFuture ->
+                viewModel.addFoodEntry(
+                    name = name,
+                    servingSize = serving,
+                    calories = calories,
+                    mealType = mealType,
+                    barcode = barcode,
+                    brandOrSupermarket = brand,
+                    saveForFuture = saveForFuture
+                )
                 showFoodSearchDialog = false
-                Toast.makeText(context, "Logged $name ($calories kcal)", Toast.LENGTH_SHORT).show()
+                val saveNotice = if (saveForFuture) " (Saved to My Foods ⭐)" else ""
+                Toast.makeText(context, "Logged $name ($calories kcal)$saveNotice", Toast.LENGTH_SHORT).show()
             }
         )
     }
@@ -750,22 +778,33 @@ fun UkFoodSearchDialog(
     viewModel: FoodViewModel,
     onDismiss: () -> Unit,
     onScanBarcodeClicked: (meal: String) -> Unit,
-    onSave: (name: String, serving: String, calories: Int, mealType: String, barcode: String?) -> Unit
+    onSave: (name: String, serving: String, calories: Int, mealType: String, barcode: String?, brand: String, saveForFuture: Boolean) -> Unit
 ) {
+    val context = LocalContext.current
     val searchQuery by viewModel.searchQuery.collectAsState()
     val selectedSupermarket by viewModel.selectedSupermarket.collectAsState()
     val searchResults by viewModel.searchResults.collectAsState()
     val isSearching by viewModel.isSearching.collectAsState()
+    val savedFoods by viewModel.savedFoodItems.collectAsState()
 
     var selectedMeal by remember { mutableStateOf(initialMealType) }
-    var activeTab by remember { mutableStateOf(0) }
+    var activeTab by remember { mutableStateOf(0) } // 0: UK Supermarkets, 1: Saved Items, 2: Custom Entry
 
+    // UK Search Portions
     var selectedItemForPortion by remember { mutableStateOf<FoodSearchResult?>(null) }
     var portionMultiplier by remember { mutableStateOf(1.0f) }
 
+    // Saved Items Tab state
+    var savedSearchQuery by remember { mutableStateOf("") }
+    var selectedSavedForPortion by remember { mutableStateOf<SavedFoodItem?>(null) }
+    var savedPortionMultiplier by remember { mutableStateOf(1.0f) }
+
+    // Custom Food Tab state
     var customName by remember { mutableStateOf("") }
     var customServing by remember { mutableStateOf("1 serving") }
     var customCalories by remember { mutableStateOf("") }
+    var customBrand by remember { mutableStateOf("Custom Food") }
+    var saveCustomForFuture by remember { mutableStateOf(true) }
 
     Dialog(onDismissRequest = onDismiss) {
         Surface(
@@ -774,12 +813,12 @@ fun UkFoodSearchDialog(
             border = BorderStroke(1.dp, AppTheme.colors.border),
             modifier = Modifier
                 .fillMaxWidth()
-                .fillMaxHeight(0.88f)
+                .fillMaxHeight(0.90f)
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(20.dp)
+                    .padding(18.dp)
             ) {
                 // Top header
                 Row(
@@ -796,7 +835,7 @@ fun UkFoodSearchDialog(
                             letterSpacing = 1.2.sp
                         )
                         Text(
-                            "UK Supermarket Database & Barcodes",
+                            "UK Database, Saved Items & Custom",
                             style = MaterialTheme.typography.bodySmall,
                             color = AppTheme.colors.primary,
                             fontSize = 11.sp
@@ -807,12 +846,12 @@ fun UkFoodSearchDialog(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(10.dp))
 
                 // Meal category selector pills
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    horizontalArrangement = Arrangement.spacedBy(5.dp)
                 ) {
                     listOf("Breakfast", "Lunch", "Dinner", "Snacks", "Drinks").forEach { meal ->
                         val isSelected = selectedMeal.equals(meal, ignoreCase = true)
@@ -836,9 +875,9 @@ fun UkFoodSearchDialog(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(10.dp))
 
-                // Tab Switcher (UK Database vs Custom Entry)
+                // Tab Switcher (UK Database, Saved Items, Custom Food)
                 TabRow(
                     selectedTabIndex = activeTab,
                     containerColor = AppTheme.colors.surfaceElevated,
@@ -850,228 +889,61 @@ fun UkFoodSearchDialog(
                     Tab(
                         selected = activeTab == 0,
                         onClick = { activeTab = 0 },
-                        text = { Text("UK Supermarkets", fontSize = 12.sp, fontWeight = FontWeight.SemiBold) }
+                        text = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.Storefront, contentDescription = null, modifier = Modifier.size(13.dp))
+                                Spacer(modifier = Modifier.width(3.dp))
+                                Text("UK Store", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                            }
+                        }
                     )
                     Tab(
                         selected = activeTab == 1,
                         onClick = { activeTab = 1 },
-                        text = { Text("Custom Food", fontSize = 12.sp, fontWeight = FontWeight.SemiBold) }
+                        text = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    Icons.Default.Star,
+                                    contentDescription = null,
+                                    tint = if (activeTab == 1) Color(0xFFFFB300) else AppTheme.colors.textMuted,
+                                    modifier = Modifier.size(13.dp)
+                                )
+                                Spacer(modifier = Modifier.width(3.dp))
+                                Text("Saved (${savedFoods.size})", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                            }
+                        }
+                    )
+                    Tab(
+                        selected = activeTab == 2,
+                        onClick = { activeTab = 2 },
+                        text = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.AddCircleOutline, contentDescription = null, modifier = Modifier.size(13.dp))
+                                Spacer(modifier = Modifier.width(3.dp))
+                                Text("Custom", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                            }
+                        }
                     )
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(10.dp))
 
-                if (activeTab == 0) {
-                    // Search Bar with Barcode Scanner Icon
-                    OutlinedTextField(
-                        value = searchQuery,
-                        onValueChange = { viewModel.onSearchQueryChanged(it) },
-                        placeholder = { Text("Search Tesco, ASDA, Sainsbury's, Heinz...", fontSize = 13.sp) },
-                        leadingIcon = {
-                            Icon(Icons.Default.Search, contentDescription = "Search", tint = AppTheme.colors.textMuted)
-                        },
-                        trailingIcon = {
-                            IconButton(onClick = { onScanBarcodeClicked(selectedMeal) }) {
-                                Icon(Icons.Default.QrCodeScanner, contentDescription = "Scan Barcode", tint = AppTheme.colors.primary)
-                            }
-                        },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = AppTheme.colors.primary,
-                            unfocusedBorderColor = AppTheme.colors.border,
-                            focusedContainerColor = AppTheme.colors.inputBackground,
-                            unfocusedContainerColor = AppTheme.colors.inputBackground,
-                            focusedTextColor = AppTheme.colors.textPrimary,
-                            unfocusedTextColor = AppTheme.colors.textPrimary
-                        )
-                    )
-
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    // Supermarket Chips Filter Row
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        UK_SUPERMARKET_CHIPS.forEach { market ->
-                            val isSelected = selectedSupermarket == market
-                            val chipColor = getSupermarketBrandColor(market)
-                            Surface(
-                                shape = RoundedCornerShape(50),
-                                color = if (isSelected) chipColor.copy(alpha = 0.25f) else AppTheme.colors.surfaceElevated,
-                                border = BorderStroke(1.dp, if (isSelected) chipColor else AppTheme.colors.border),
-                                modifier = Modifier.clickable {
-                                    viewModel.onSupermarketFilterChanged(market)
-                                }
-                            ) {
-                                Text(
-                                    text = market,
-                                    color = if (isSelected) chipColor else AppTheme.colors.textSecondary,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
-                                )
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    // Portion Selector Overlay if an item is selected
-                    if (selectedItemForPortion != null) {
-                        val item = selectedItemForPortion!!
-                        val calculatedCalories = (item.caloriesPerServing * portionMultiplier).toInt()
-                        Surface(
-                            shape = RoundedCornerShape(16.dp),
-                            color = AppTheme.colors.surfaceElevated,
-                            border = BorderStroke(1.5.dp, AppTheme.colors.primary),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Column(modifier = Modifier.padding(14.dp)) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(
-                                            text = item.name,
-                                            fontWeight = FontWeight.Bold,
-                                            color = AppTheme.colors.textPrimary,
-                                            fontSize = 14.sp
-                                        )
-                                        Text(
-                                            text = "${item.brandOrSupermarket} • ${item.servingSize}",
-                                            color = AppTheme.colors.textSecondary,
-                                            fontSize = 12.sp
-                                        )
-                                    }
-                                    IconButton(
-                                        onClick = { selectedItemForPortion = null },
-                                        modifier = Modifier.size(24.dp)
-                                    ) {
-                                        Icon(Icons.Default.Close, contentDescription = "Deselect", tint = AppTheme.colors.textMuted)
-                                    }
-                                }
-
-                                Spacer(modifier = Modifier.height(10.dp))
-
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                ) {
-                                    listOf(0.5f to "1/2", 1.0f to "1x", 1.5f to "1.5x", 2.0f to "2x").forEach { (mult, label) ->
-                                        val isMultSelected = portionMultiplier == mult
-                                        Surface(
-                                            shape = RoundedCornerShape(8.dp),
-                                            color = if (isMultSelected) AppTheme.colors.primary else AppTheme.colors.surface,
-                                            border = BorderStroke(1.dp, if (isMultSelected) AppTheme.colors.primary else AppTheme.colors.border),
-                                            modifier = Modifier
-                                                .weight(1f)
-                                                .clickable { portionMultiplier = mult }
-                                        ) {
-                                            Text(
-                                                text = label,
-                                                color = if (isMultSelected) Color.White else AppTheme.colors.textPrimary,
-                                                fontSize = 12.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                textAlign = TextAlign.Center,
-                                                modifier = Modifier.padding(vertical = 6.dp)
-                                            )
-                                        }
-                                    }
-                                }
-
-                                Spacer(modifier = Modifier.height(12.dp))
-
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = "$calculatedCalories kcal",
-                                        color = AppTheme.colors.success,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 18.sp
-                                    )
-                                    Button(
-                                        onClick = {
-                                            val servingDesc = if (portionMultiplier == 1.0f) item.servingSize else "${portionMultiplier}x ${item.servingSize}"
-                                            onSave(item.name, servingDesc, calculatedCalories, selectedMeal, item.barcode)
-                                        },
-                                        colors = ButtonDefaults.buttonColors(containerColor = AppTheme.colors.primary),
-                                        shape = RoundedCornerShape(10.dp)
-                                    ) {
-                                        Text("Log to $selectedMeal", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Color.White)
-                                    }
-                                }
-                            }
-                        }
-                        Spacer(modifier = Modifier.height(10.dp))
-                    }
-
-                    // Results list
-                    if (isSearching) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(120.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            CircularProgressIndicator(color = AppTheme.colors.primary, modifier = Modifier.size(24.dp))
-                        }
-                    } else if (searchResults.isEmpty()) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .weight(1f),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text("No UK items found matching query", color = AppTheme.colors.textMuted, fontSize = 13.sp)
-                                Spacer(modifier = Modifier.height(6.dp))
-                                Text(
-                                    "Try switching to 'Custom Food' tab to add manually",
-                                    color = AppTheme.colors.primary,
-                                    fontSize = 12.sp,
-                                    modifier = Modifier.clickable { activeTab = 1 }
-                                )
-                            }
-                        }
-                    } else {
-                        LazyColumn(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .weight(1f),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            items(searchResults) { item ->
-                                UkFoodResultItemRow(
-                                    item = item,
-                                    onSelect = {
-                                        selectedItemForPortion = item
-                                        portionMultiplier = 1.0f
-                                    }
-                                )
-                            }
-                        }
-                    }
-                } else {
-                    // Manual Custom Entry
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f)
-                    ) {
+                when (activeTab) {
+                    0 -> {
+                        // UK Supermarket Database Search
                         OutlinedTextField(
-                            value = customName,
-                            onValueChange = { customName = it },
-                            label = { Text("Food / Beverage Name") },
-                            placeholder = { Text("e.g. Homemade Chicken Stew") },
+                            value = searchQuery,
+                            onValueChange = { viewModel.onSearchQueryChanged(it) },
+                            placeholder = { Text("Search Tesco, ASDA, Sainsbury's, Heinz...", fontSize = 13.sp) },
+                            leadingIcon = {
+                                Icon(Icons.Default.Search, contentDescription = "Search", tint = AppTheme.colors.textMuted)
+                            },
+                            trailingIcon = {
+                                IconButton(onClick = { onScanBarcodeClicked(selectedMeal) }) {
+                                    Icon(Icons.Default.QrCodeScanner, contentDescription = "Scan Barcode", tint = AppTheme.colors.primary)
+                                }
+                            },
+                            singleLine = true,
                             modifier = Modifier.fillMaxWidth(),
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedBorderColor = AppTheme.colors.primary,
@@ -1083,61 +955,708 @@ fun UkFoodSearchDialog(
                             )
                         )
 
-                        Spacer(modifier = Modifier.height(10.dp))
+                        Spacer(modifier = Modifier.height(8.dp))
 
+                        // Supermarket Chips Filter Row
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            OutlinedTextField(
-                                value = customCalories,
-                                onValueChange = { if (it.all { c -> c.isDigit() }) customCalories = it },
-                                label = { Text("Calories (kcal)") },
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                modifier = Modifier.weight(1f),
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = AppTheme.colors.primary,
-                                    unfocusedBorderColor = AppTheme.colors.border,
-                                    focusedContainerColor = AppTheme.colors.inputBackground,
-                                    unfocusedContainerColor = AppTheme.colors.inputBackground,
-                                    focusedTextColor = AppTheme.colors.textPrimary,
-                                    unfocusedTextColor = AppTheme.colors.textPrimary
-                                )
-                            )
-
-                            OutlinedTextField(
-                                value = customServing,
-                                onValueChange = { customServing = it },
-                                label = { Text("Portion / Serving") },
-                                modifier = Modifier.weight(1f),
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = AppTheme.colors.primary,
-                                    unfocusedBorderColor = AppTheme.colors.border,
-                                    focusedContainerColor = AppTheme.colors.inputBackground,
-                                    unfocusedContainerColor = AppTheme.colors.inputBackground,
-                                    focusedTextColor = AppTheme.colors.textPrimary,
-                                    unfocusedTextColor = AppTheme.colors.textPrimary
-                                )
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.weight(1f))
-
-                        Button(
-                            onClick = {
-                                val cal = customCalories.toIntOrNull() ?: 0
-                                onSave(customName, customServing, cal, selectedMeal, null)
-                            },
-                            enabled = customName.isNotBlank() && customCalories.isNotBlank(),
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(48.dp),
-                            shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = AppTheme.colors.primary)
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
-                            Text("Add Custom Food to $selectedMeal", fontWeight = FontWeight.Bold, color = Color.White)
+                            UK_SUPERMARKET_CHIPS.forEach { market ->
+                                val isSelected = selectedSupermarket == market
+                                val chipColor = getSupermarketBrandColor(market)
+                                Surface(
+                                    shape = RoundedCornerShape(50),
+                                    color = if (isSelected) chipColor.copy(alpha = 0.25f) else AppTheme.colors.surfaceElevated,
+                                    border = BorderStroke(1.dp, if (isSelected) chipColor else AppTheme.colors.border),
+                                    modifier = Modifier.clickable {
+                                        viewModel.onSupermarketFilterChanged(market)
+                                    }
+                                ) {
+                                    Text(
+                                        text = market,
+                                        color = if (isSelected) chipColor else AppTheme.colors.textSecondary,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                                    )
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        // Portion Selector Overlay if an item is selected
+                        if (selectedItemForPortion != null) {
+                            val item = selectedItemForPortion!!
+                            val calculatedCalories = (item.caloriesPerServing * portionMultiplier).toInt()
+                            Surface(
+                                shape = RoundedCornerShape(14.dp),
+                                color = AppTheme.colors.surfaceElevated,
+                                border = BorderStroke(1.5.dp, AppTheme.colors.primary),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(modifier = Modifier.padding(12.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = item.name,
+                                                fontWeight = FontWeight.Bold,
+                                                color = AppTheme.colors.textPrimary,
+                                                fontSize = 13.sp,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                            Text(
+                                                text = "${item.brandOrSupermarket} • ${item.servingSize}",
+                                                color = AppTheme.colors.textSecondary,
+                                                fontSize = 11.sp
+                                            )
+                                        }
+                                        IconButton(
+                                            onClick = { selectedItemForPortion = null },
+                                            modifier = Modifier.size(24.dp)
+                                        ) {
+                                            Icon(Icons.Default.Close, contentDescription = "Deselect", tint = AppTheme.colors.textMuted)
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.height(8.dp))
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        listOf(0.5f to "1/2", 1.0f to "1x", 1.5f to "1.5x", 2.0f to "2x").forEach { (mult, label) ->
+                                            val isMultSelected = portionMultiplier == mult
+                                            Surface(
+                                                shape = RoundedCornerShape(8.dp),
+                                                color = if (isMultSelected) AppTheme.colors.primary else AppTheme.colors.surface,
+                                                border = BorderStroke(1.dp, if (isMultSelected) AppTheme.colors.primary else AppTheme.colors.border),
+                                                modifier = Modifier
+                                                    .weight(1f)
+                                                    .clickable { portionMultiplier = mult }
+                                            ) {
+                                                Text(
+                                                    text = label,
+                                                    color = if (isMultSelected) Color.White else AppTheme.colors.textPrimary,
+                                                    fontSize = 12.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    textAlign = TextAlign.Center,
+                                                    modifier = Modifier.padding(vertical = 5.dp)
+                                                )
+                                            }
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.height(10.dp))
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = "$calculatedCalories kcal",
+                                            color = AppTheme.colors.success,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 16.sp
+                                        )
+                                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                            OutlinedButton(
+                                                onClick = {
+                                                    viewModel.saveFoodItemDirectly(
+                                                        name = item.name,
+                                                        servingSize = item.servingSize,
+                                                        calories = item.caloriesPerServing,
+                                                        defaultMealType = selectedMeal,
+                                                        barcode = item.barcode,
+                                                        brandOrSupermarket = item.brandOrSupermarket
+                                                    )
+                                                    Toast.makeText(context, "Saved '${item.name}' to My Foods ⭐", Toast.LENGTH_SHORT).show()
+                                                },
+                                                shape = RoundedCornerShape(8.dp),
+                                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                                                border = BorderStroke(1.dp, Color(0xFFFFB300))
+                                            ) {
+                                                Icon(Icons.Default.Star, contentDescription = null, tint = Color(0xFFFFB300), modifier = Modifier.size(14.dp))
+                                                Spacer(modifier = Modifier.width(4.dp))
+                                                Text("Save", fontSize = 11.sp, color = AppTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
+                                            }
+
+                                            Button(
+                                                onClick = {
+                                                    val servingDesc = if (portionMultiplier == 1.0f) item.servingSize else "${portionMultiplier}x ${item.servingSize}"
+                                                    onSave(item.name, servingDesc, calculatedCalories, selectedMeal, item.barcode, item.brandOrSupermarket, false)
+                                                },
+                                                colors = ButtonDefaults.buttonColors(containerColor = AppTheme.colors.primary),
+                                                shape = RoundedCornerShape(8.dp),
+                                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                                            ) {
+                                                Text("Log to $selectedMeal", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color.White)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                        }
+
+                        // Results list
+                        if (isSearching) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(120.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                CircularProgressIndicator(color = AppTheme.colors.primary, modifier = Modifier.size(24.dp))
+                            }
+                        } else if (searchResults.isEmpty()) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .weight(1f),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text("No UK items found matching query", color = AppTheme.colors.textMuted, fontSize = 13.sp)
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Text(
+                                        "Try switching to 'Custom' tab to add manually",
+                                        color = AppTheme.colors.primary,
+                                        fontSize = 12.sp,
+                                        modifier = Modifier.clickable { activeTab = 2 }
+                                    )
+                                }
+                            }
+                        } else {
+                            LazyColumn(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .weight(1f),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                items(searchResults) { item ->
+                                    UkFoodResultItemRow(
+                                        item = item,
+                                        onSelect = {
+                                            selectedItemForPortion = item
+                                            portionMultiplier = 1.0f
+                                        }
+                                    )
+                                }
+                            }
                         }
                     }
+                    1 -> {
+                        // Saved Foods Tab
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f)
+                        ) {
+                            if (savedFoods.isNotEmpty()) {
+                                OutlinedTextField(
+                                    value = savedSearchQuery,
+                                    onValueChange = { savedSearchQuery = it },
+                                    placeholder = { Text("Filter your saved foods...", fontSize = 13.sp) },
+                                    leadingIcon = {
+                                        Icon(Icons.Default.Search, contentDescription = "Search", tint = AppTheme.colors.textMuted)
+                                    },
+                                    trailingIcon = {
+                                        if (savedSearchQuery.isNotEmpty()) {
+                                            IconButton(onClick = { savedSearchQuery = "" }) {
+                                                Icon(Icons.Default.Close, contentDescription = "Clear", tint = AppTheme.colors.textMuted)
+                                            }
+                                        }
+                                    },
+                                    singleLine = true,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedBorderColor = AppTheme.colors.primary,
+                                        unfocusedBorderColor = AppTheme.colors.border,
+                                        focusedContainerColor = AppTheme.colors.inputBackground,
+                                        unfocusedContainerColor = AppTheme.colors.inputBackground,
+                                        focusedTextColor = AppTheme.colors.textPrimary,
+                                        unfocusedTextColor = AppTheme.colors.textPrimary
+                                    )
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                            }
+
+                            // Portion Selector Overlay if a saved item is selected
+                            if (selectedSavedForPortion != null) {
+                                val item = selectedSavedForPortion!!
+                                val calculatedCalories = (item.calories * savedPortionMultiplier).toInt()
+                                Surface(
+                                    shape = RoundedCornerShape(14.dp),
+                                    color = AppTheme.colors.surfaceElevated,
+                                    border = BorderStroke(1.5.dp, AppTheme.colors.primary),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Column(modifier = Modifier.padding(12.dp)) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Column(modifier = Modifier.weight(1f)) {
+                                                Text(
+                                                    text = item.name,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = AppTheme.colors.textPrimary,
+                                                    fontSize = 13.sp,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                                Text(
+                                                    text = "${item.brandOrSupermarket} • ${item.servingSize}",
+                                                    color = AppTheme.colors.textSecondary,
+                                                    fontSize = 11.sp
+                                                )
+                                            }
+                                            IconButton(
+                                                onClick = { selectedSavedForPortion = null },
+                                                modifier = Modifier.size(24.dp)
+                                            ) {
+                                                Icon(Icons.Default.Close, contentDescription = "Deselect", tint = AppTheme.colors.textMuted)
+                                            }
+                                        }
+
+                                        Spacer(modifier = Modifier.height(8.dp))
+
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            listOf(0.5f to "1/2", 1.0f to "1x", 1.5f to "1.5x", 2.0f to "2x").forEach { (mult, label) ->
+                                                val isMultSelected = savedPortionMultiplier == mult
+                                                Surface(
+                                                    shape = RoundedCornerShape(8.dp),
+                                                    color = if (isMultSelected) AppTheme.colors.primary else AppTheme.colors.surface,
+                                                    border = BorderStroke(1.dp, if (isMultSelected) AppTheme.colors.primary else AppTheme.colors.border),
+                                                    modifier = Modifier
+                                                        .weight(1f)
+                                                        .clickable { savedPortionMultiplier = mult }
+                                                ) {
+                                                    Text(
+                                                        text = label,
+                                                        color = if (isMultSelected) Color.White else AppTheme.colors.textPrimary,
+                                                        fontSize = 12.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        textAlign = TextAlign.Center,
+                                                        modifier = Modifier.padding(vertical = 5.dp)
+                                                    )
+                                                }
+                                            }
+                                        }
+
+                                        Spacer(modifier = Modifier.height(10.dp))
+
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                text = "$calculatedCalories kcal",
+                                                color = AppTheme.colors.success,
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 16.sp
+                                            )
+                                            Button(
+                                                onClick = {
+                                                    val servingDesc = if (savedPortionMultiplier == 1.0f) item.servingSize else "${savedPortionMultiplier}x ${item.servingSize}"
+                                                    onSave(item.name, servingDesc, calculatedCalories, selectedMeal, item.barcode, item.brandOrSupermarket, false)
+                                                },
+                                                colors = ButtonDefaults.buttonColors(containerColor = AppTheme.colors.primary),
+                                                shape = RoundedCornerShape(8.dp),
+                                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+                                            ) {
+                                                Text("Log to $selectedMeal", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color.White)
+                                            }
+                                        }
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(8.dp))
+                            }
+
+                            val filteredSaved = remember(savedFoods, savedSearchQuery) {
+                                if (savedSearchQuery.isBlank()) savedFoods
+                                else savedFoods.filter {
+                                    it.name.contains(savedSearchQuery, ignoreCase = true) ||
+                                    it.brandOrSupermarket.contains(savedSearchQuery, ignoreCase = true) ||
+                                    (it.barcode != null && it.barcode.contains(savedSearchQuery))
+                                }
+                            }
+
+                            if (savedFoods.isEmpty()) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .weight(1f),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        modifier = Modifier.padding(16.dp)
+                                    ) {
+                                        Surface(
+                                            shape = CircleShape,
+                                            color = AppTheme.colors.primary.copy(alpha = 0.12f),
+                                            modifier = Modifier.size(52.dp)
+                                        ) {
+                                            Box(contentAlignment = Alignment.Center) {
+                                                Icon(Icons.Default.StarBorder, contentDescription = null, tint = AppTheme.colors.primary, modifier = Modifier.size(26.dp))
+                                            }
+                                        }
+                                        Spacer(modifier = Modifier.height(10.dp))
+                                        Text("No Saved Products Yet", fontWeight = FontWeight.Bold, color = AppTheme.colors.textPrimary, fontSize = 14.sp)
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text(
+                                            "When scanning barcodes or adding custom foods, check 'Save product for future use' to build your quick-select list.",
+                                            color = AppTheme.colors.textSecondary,
+                                            fontSize = 11.sp,
+                                            textAlign = TextAlign.Center
+                                        )
+                                        Spacer(modifier = Modifier.height(14.dp))
+                                        Button(
+                                            onClick = { activeTab = 2 },
+                                            colors = ButtonDefaults.buttonColors(containerColor = AppTheme.colors.primary),
+                                            shape = RoundedCornerShape(10.dp)
+                                        ) {
+                                            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(15.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("Add Custom Food", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                }
+                            } else if (filteredSaved.isEmpty()) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .weight(1f),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text("No saved items matching \"$savedSearchQuery\"", color = AppTheme.colors.textMuted, fontSize = 13.sp)
+                                }
+                            } else {
+                                LazyColumn(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .weight(1f),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    items(filteredSaved, key = { it.id }) { item ->
+                                        SavedFoodItemRow(
+                                            item = item,
+                                            onSelect = {
+                                                selectedSavedForPortion = item
+                                                savedPortionMultiplier = 1.0f
+                                            },
+                                            onDelete = {
+                                                viewModel.deleteSavedFoodItem(item)
+                                                Toast.makeText(context, "Removed ${item.name} from saved items", Toast.LENGTH_SHORT).show()
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    2 -> {
+                        // Manual Custom Entry Tab
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f)
+                        ) {
+                            OutlinedTextField(
+                                value = customName,
+                                onValueChange = { customName = it },
+                                label = { Text("Food / Beverage Name") },
+                                placeholder = { Text("e.g. Homemade Roast Chicken, Oats & Honey") },
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = AppTheme.colors.primary,
+                                    unfocusedBorderColor = AppTheme.colors.border,
+                                    focusedContainerColor = AppTheme.colors.inputBackground,
+                                    unfocusedContainerColor = AppTheme.colors.inputBackground,
+                                    focusedTextColor = AppTheme.colors.textPrimary,
+                                    unfocusedTextColor = AppTheme.colors.textPrimary
+                                )
+                            )
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                OutlinedTextField(
+                                    value = customCalories,
+                                    onValueChange = { if (it.all { c -> c.isDigit() }) customCalories = it },
+                                    label = { Text("Calories (kcal)") },
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                    modifier = Modifier.weight(1f),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedBorderColor = AppTheme.colors.primary,
+                                        unfocusedBorderColor = AppTheme.colors.border,
+                                        focusedContainerColor = AppTheme.colors.inputBackground,
+                                        unfocusedContainerColor = AppTheme.colors.inputBackground,
+                                        focusedTextColor = AppTheme.colors.textPrimary,
+                                        unfocusedTextColor = AppTheme.colors.textPrimary
+                                    )
+                                )
+
+                                OutlinedTextField(
+                                    value = customServing,
+                                    onValueChange = { customServing = it },
+                                    label = { Text("Portion / Serving") },
+                                    modifier = Modifier.weight(1f),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedBorderColor = AppTheme.colors.primary,
+                                        unfocusedBorderColor = AppTheme.colors.border,
+                                        focusedContainerColor = AppTheme.colors.inputBackground,
+                                        unfocusedContainerColor = AppTheme.colors.inputBackground,
+                                        focusedTextColor = AppTheme.colors.textPrimary,
+                                        unfocusedTextColor = AppTheme.colors.textPrimary
+                                    )
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            OutlinedTextField(
+                                value = customBrand,
+                                onValueChange = { customBrand = it },
+                                label = { Text("Brand or Tag (Optional)") },
+                                placeholder = { Text("e.g. Homemade, Local Cafe, Custom") },
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = AppTheme.colors.primary,
+                                    unfocusedBorderColor = AppTheme.colors.border,
+                                    focusedContainerColor = AppTheme.colors.inputBackground,
+                                    unfocusedContainerColor = AppTheme.colors.inputBackground,
+                                    focusedTextColor = AppTheme.colors.textPrimary,
+                                    unfocusedTextColor = AppTheme.colors.textPrimary
+                                )
+                            )
+
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            // Save for future use toggle
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = if (saveCustomForFuture) AppTheme.colors.primary.copy(alpha = 0.12f) else AppTheme.colors.surfaceElevated,
+                                border = BorderStroke(1.dp, if (saveCustomForFuture) AppTheme.colors.primary.copy(alpha = 0.45f) else AppTheme.colors.border),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { saveCustomForFuture = !saveCustomForFuture }
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Checkbox(
+                                        checked = saveCustomForFuture,
+                                        onCheckedChange = { saveCustomForFuture = it },
+                                        colors = CheckboxDefaults.colors(
+                                            checkedColor = AppTheme.colors.primary,
+                                            checkmarkColor = Color.White
+                                        )
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(
+                                                Icons.Default.Star,
+                                                contentDescription = null,
+                                                tint = if (saveCustomForFuture) Color(0xFFFFB300) else AppTheme.colors.textMuted,
+                                                modifier = Modifier.size(15.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text(
+                                                "Save to My Saved Foods for future use",
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 12.sp,
+                                                color = AppTheme.colors.textPrimary
+                                            )
+                                        }
+                                        Text(
+                                            "Easily select this saved product in the 'Saved' tab anytime",
+                                            fontSize = 10.sp,
+                                            color = AppTheme.colors.textSecondary
+                                        )
+                                    }
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.weight(1f))
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                OutlinedButton(
+                                    onClick = {
+                                        val cal = customCalories.toIntOrNull() ?: 0
+                                        viewModel.saveFoodItemDirectly(
+                                            name = customName,
+                                            servingSize = customServing,
+                                            calories = cal,
+                                            defaultMealType = selectedMeal,
+                                            barcode = null,
+                                            brandOrSupermarket = customBrand.ifBlank { "Custom Food" }
+                                        )
+                                        Toast.makeText(context, "Saved '$customName' to My Saved Foods ⭐", Toast.LENGTH_SHORT).show()
+                                        activeTab = 1 // Switch to Saved tab
+                                    },
+                                    enabled = customName.isNotBlank() && customCalories.isNotBlank(),
+                                    shape = RoundedCornerShape(10.dp),
+                                    modifier = Modifier
+                                        .weight(0.9f)
+                                        .height(46.dp)
+                                ) {
+                                    Icon(Icons.Default.Star, contentDescription = null, tint = Color(0xFFFFB300), modifier = Modifier.size(15.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Save Only", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                }
+
+                                Button(
+                                    onClick = {
+                                        val cal = customCalories.toIntOrNull() ?: 0
+                                        onSave(
+                                            customName,
+                                            customServing,
+                                            cal,
+                                            selectedMeal,
+                                            null,
+                                            customBrand.ifBlank { "Custom Food" },
+                                            saveCustomForFuture
+                                        )
+                                    },
+                                    enabled = customName.isNotBlank() && customCalories.isNotBlank(),
+                                    modifier = Modifier
+                                        .weight(1.1f)
+                                        .height(46.dp),
+                                    shape = RoundedCornerShape(10.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = AppTheme.colors.primary)
+                                ) {
+                                    Text("Log to $selectedMeal", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color.White)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun SavedFoodItemRow(
+    item: SavedFoodItem,
+    onSelect: () -> Unit,
+    onDelete: () -> Unit
+) {
+    val brandColor = getSupermarketBrandColor(item.brandOrSupermarket)
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = AppTheme.colors.surfaceElevated,
+        border = BorderStroke(1.dp, AppTheme.colors.border),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onSelect)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Surface(
+                        shape = RoundedCornerShape(4.dp),
+                        color = brandColor.copy(alpha = 0.2f),
+                        border = BorderStroke(1.dp, brandColor.copy(alpha = 0.6f))
+                    ) {
+                        Text(
+                            text = item.brandOrSupermarket,
+                            color = brandColor,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                        )
+                    }
+                    if (item.barcode != null) {
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Icon(
+                            Icons.Default.QrCode,
+                            contentDescription = "Barcode available",
+                            tint = AppTheme.colors.textMuted,
+                            modifier = Modifier.size(13.dp)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                Text(
+                    text = item.name,
+                    color = AppTheme.colors.textPrimary,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 13.sp,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+
+                Text(
+                    text = item.servingSize,
+                    color = AppTheme.colors.textMuted,
+                    fontSize = 11.sp
+                )
+            }
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(
+                        text = "${item.calories} kcal",
+                        color = AppTheme.colors.success,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp
+                    )
+                    Text(
+                        text = "Tap to add",
+                        color = AppTheme.colors.primary,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+                IconButton(
+                    onClick = onDelete,
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Icon(
+                        Icons.Default.DeleteOutline,
+                        contentDescription = "Remove saved item",
+                        tint = AppTheme.colors.textMuted.copy(alpha = 0.7f),
+                        modifier = Modifier.size(18.dp)
+                    )
                 }
             }
         }
@@ -1237,12 +1756,13 @@ fun LogScannedProductDialog(
     product: FoodSearchResult,
     initialMealType: String,
     onDismiss: () -> Unit,
-    onConfirm: (name: String, serving: String, calories: Int, mealType: String, barcode: String?) -> Unit
+    onConfirm: (name: String, serving: String, calories: Int, mealType: String, barcode: String?, brand: String, saveForFuture: Boolean) -> Unit
 ) {
     var editableName by remember { mutableStateOf(product.name) }
     var editableServing by remember { mutableStateOf(product.servingSize) }
     var editableCalories by remember { mutableStateOf(product.caloriesPerServing.toString()) }
     var selectedMeal by remember { mutableStateOf(initialMealType) }
+    var saveForFuture by remember { mutableStateOf(true) }
 
     val brandColor = getSupermarketBrandColor(product.brandOrSupermarket)
     val isFound = product.name.isNotBlank()
@@ -1413,12 +1933,69 @@ fun LogScannedProductDialog(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(18.dp))
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Save for future use toggle
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = if (saveForFuture) AppTheme.colors.primary.copy(alpha = 0.12f) else AppTheme.colors.surfaceElevated,
+                    border = BorderStroke(1.dp, if (saveForFuture) AppTheme.colors.primary.copy(alpha = 0.45f) else AppTheme.colors.border),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { saveForFuture = !saveForFuture }
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Checkbox(
+                            checked = saveForFuture,
+                            onCheckedChange = { saveForFuture = it },
+                            colors = CheckboxDefaults.colors(
+                                checkedColor = AppTheme.colors.primary,
+                                checkmarkColor = Color.White
+                            )
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    Icons.Default.Star,
+                                    contentDescription = null,
+                                    tint = if (saveForFuture) Color(0xFFFFB300) else AppTheme.colors.textMuted,
+                                    modifier = Modifier.size(15.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    "Save product for future use",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 12.sp,
+                                    color = AppTheme.colors.textPrimary
+                                )
+                            }
+                            Text(
+                                "Easily re-select this product anytime without needing the barcode",
+                                fontSize = 10.sp,
+                                color = AppTheme.colors.textSecondary
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
 
                 Button(
                     onClick = {
                         val baseCal = editableCalories.toIntOrNull() ?: 0
-                        onConfirm(editableName, editableServing, baseCal, selectedMeal, product.barcode)
+                        onConfirm(
+                            editableName,
+                            editableServing,
+                            baseCal,
+                            selectedMeal,
+                            product.barcode,
+                            product.brandOrSupermarket,
+                            saveForFuture
+                        )
                     },
                     enabled = editableName.isNotBlank() && editableCalories.isNotBlank(),
                     modifier = Modifier

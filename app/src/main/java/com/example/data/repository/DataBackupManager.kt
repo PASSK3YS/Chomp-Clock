@@ -6,6 +6,7 @@ import com.example.BuildConfig
 import com.example.data.local.AppDatabase
 import com.example.data.local.entity.FastSession
 import com.example.data.local.entity.FoodEntry
+import com.example.data.local.entity.SavedFoodItem
 import com.example.data.local.entity.WeightEntry
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.firstOrNull
@@ -24,6 +25,7 @@ data class BackupImportResult(
     val fastsCount: Int = 0,
     val foodCount: Int = 0,
     val weightCount: Int = 0,
+    val savedFoodsCount: Int = 0,
     val message: String
 )
 
@@ -36,11 +38,12 @@ class DataBackupManager(private val context: Context) {
         val fasts = db.fastSessionDao().getAllDirect()
         val food = db.foodEntryDao().getAllDirect()
         val weights = db.weightEntryDao().getAllDirect()
+        val savedFoods = db.savedFoodItemDao().getAllDirect()
         val prefs = userPrefsRepo.userPreferencesFlow.firstOrNull()
 
         val root = JSONObject()
         root.put("app", "ChompClock")
-        root.put("schemaVersion", 2)
+        root.put("schemaVersion", 3)
         root.put("appVersion", BuildConfig.VERSION_NAME)
         root.put("exportedAt", SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ", Locale.UK).format(Date()))
 
@@ -75,6 +78,24 @@ class DataBackupManager(private val context: Context) {
             foodArray.put(obj)
         }
         root.put("foodEntries", foodArray)
+
+        // Saved Food Items (Custom / Favorite products)
+        val savedArray = JSONArray()
+        savedFoods.forEach { item ->
+            val obj = JSONObject()
+            obj.put("id", item.id)
+            obj.put("name", item.name)
+            obj.put("servingSize", item.servingSize)
+            obj.put("calories", item.calories)
+            obj.put("defaultMealType", item.defaultMealType)
+            obj.put("brandOrSupermarket", item.brandOrSupermarket)
+            obj.put("createdAt", item.createdAt)
+            if (item.barcode != null) {
+                obj.put("barcode", item.barcode)
+            }
+            savedArray.put(obj)
+        }
+        root.put("savedFoodItems", savedArray)
 
         // Weight Entries
         val weightArray = JSONArray()
@@ -116,6 +137,7 @@ class DataBackupManager(private val context: Context) {
         val fasts = db.fastSessionDao().getAllDirect()
         val food = db.foodEntryDao().getAllDirect()
         val weights = db.weightEntryDao().getAllDirect()
+        val savedFoods = db.savedFoodItemDao().getAllDirect()
         val prefs = userPrefsRepo.userPreferencesFlow.firstOrNull()
 
         val sb = StringBuilder()
@@ -145,7 +167,19 @@ class DataBackupManager(private val context: Context) {
         }
         sb.append("\n")
 
-        // 3. WEIGHT & MEASUREMENTS
+        // 3. SAVED / FREQUENT FOOD ITEMS
+        sb.append("--- SAVED & FAVORITE FOOD PRODUCTS ---\n")
+        sb.append("Saved ID,Product Name,Portion / Serving,Calories (kcal),Default Meal,Brand,Barcode\n")
+        savedFoods.forEach { item ->
+            val cleanName = item.name.replace("\"", "\"\"")
+            val cleanServing = item.servingSize.replace("\"", "\"\"")
+            val cleanBrand = item.brandOrSupermarket.replace("\"", "\"\"")
+            val barcodeStr = item.barcode ?: ""
+            sb.append("${item.id},\"$cleanName\",\"$cleanServing\",${item.calories},\"${item.defaultMealType}\",\"$cleanBrand\",\"$barcodeStr\"\n")
+        }
+        sb.append("\n")
+
+        // 4. WEIGHT & MEASUREMENTS
         sb.append("--- WEIGHT & BODY MEASUREMENTS ---\n")
         sb.append("Entry ID,Date & Time,Weight (kg),Weight (lbs),Weight (st & lbs),Waist (cm)\n")
         weights.forEach { w ->
@@ -158,7 +192,7 @@ class DataBackupManager(private val context: Context) {
         }
         sb.append("\n")
 
-        // 4. USER PROFILE & PREFERENCES
+        // 5. USER PROFILE & PREFERENCES
         if (prefs != null) {
             sb.append("--- USER PROFILE SUMMARY ---\n")
             sb.append("Username,Gender,Height (cm),Weight Unit,Daily Calorie Goal,Custom Goal Active\n")
@@ -189,12 +223,12 @@ class DataBackupManager(private val context: Context) {
                 BufferedReader(InputStreamReader(inputStream)).use { reader ->
                     reader.readText()
                 }
-            } ?: return@withContext BackupImportResult(false, 0, 0, 0, "Could not open selected file.")
+            } ?: return@withContext BackupImportResult(false, 0, 0, 0, 0, "Could not open selected file.")
 
             importFromJsonString(jsonString, clearExisting)
         } catch (e: Exception) {
             e.printStackTrace()
-            BackupImportResult(false, 0, 0, 0, "Import failed: ${e.localizedMessage}")
+            BackupImportResult(false, 0, 0, 0, 0, "Import failed: ${e.localizedMessage}")
         }
     }
 
@@ -206,11 +240,13 @@ class DataBackupManager(private val context: Context) {
                 db.fastSessionDao().deleteAll()
                 db.foodEntryDao().deleteAll()
                 db.weightEntryDao().deleteAll()
+                db.savedFoodItemDao().deleteAll()
             }
 
             var fastsImported = 0
             var foodImported = 0
             var weightImported = 0
+            var savedFoodsImported = 0
 
             // Import Fasting Sessions
             if (root.has("fastSessions")) {
@@ -269,6 +305,39 @@ class DataBackupManager(private val context: Context) {
                 }
             }
 
+            // Import Saved / Frequent Food Items
+            if (root.has("savedFoodItems")) {
+                val savedArray = root.getJSONArray("savedFoodItems")
+                val savedList = mutableListOf<SavedFoodItem>()
+                for (i in 0 until savedArray.length()) {
+                    val obj = savedArray.getJSONObject(i)
+                    val name = obj.optString("name", "Saved Item")
+                    val serving = obj.optString("servingSize", "1 serving")
+                    val calories = obj.optInt("calories", 0)
+                    val mealType = obj.optString("defaultMealType", "Snacks")
+                    val brand = obj.optString("brandOrSupermarket", "Saved Food")
+                    val createdAt = obj.optLong("createdAt", System.currentTimeMillis())
+                    val barcode = if (obj.has("barcode") && !obj.isNull("barcode")) obj.getString("barcode") else null
+
+                    savedList.add(
+                        SavedFoodItem(
+                            id = 0,
+                            name = name,
+                            servingSize = serving,
+                            calories = calories,
+                            defaultMealType = mealType,
+                            brandOrSupermarket = brand,
+                            createdAt = createdAt,
+                            barcode = barcode
+                        )
+                    )
+                }
+                if (savedList.isNotEmpty()) {
+                    db.savedFoodItemDao().insertAll(savedList)
+                    savedFoodsImported = savedList.size
+                }
+            }
+
             // Import Weight Entries
             if (root.has("weightEntries")) {
                 val weightArray = root.getJSONArray("weightEntries")
@@ -313,16 +382,18 @@ class DataBackupManager(private val context: Context) {
                 }
             }
 
+            val savedInfo = if (savedFoodsImported > 0) ", and $savedFoodsImported saved items" else ""
             BackupImportResult(
                 success = true,
                 fastsCount = fastsImported,
                 foodCount = foodImported,
                 weightCount = weightImported,
-                message = "Successfully imported $fastsImported fasts, $foodImported food logs, and $weightImported weight records."
+                savedFoodsCount = savedFoodsImported,
+                message = "Successfully imported $fastsImported fasts, $foodImported food logs, $weightImported weight records$savedInfo."
             )
         } catch (e: Exception) {
             e.printStackTrace()
-            BackupImportResult(false, 0, 0, 0, "Invalid JSON backup file format: ${e.localizedMessage}")
+            BackupImportResult(false, 0, 0, 0, 0, "Invalid JSON backup file format: ${e.localizedMessage}")
         }
     }
 }

@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.local.AppDatabase
 import com.example.data.local.entity.FoodEntry
+import com.example.data.local.entity.SavedFoodItem
 import com.example.data.repository.FoodSearchResult
 import com.example.data.repository.UkFoodRepository
 import kotlinx.coroutines.Job
@@ -27,9 +28,13 @@ sealed class BarcodeLookupState {
 class FoodViewModel(application: Application) : AndroidViewModel(application) {
     private val db = AppDatabase.getDatabase(application)
     private val dao = db.foodEntryDao()
+    private val savedDao = db.savedFoodItemDao()
     private val repository = UkFoodRepository()
 
     val foodEntries: StateFlow<List<FoodEntry>> = dao.getAllEntries()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val savedFoodItems: StateFlow<List<SavedFoodItem>> = savedDao.getAllSavedItems()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     // Search state
@@ -89,19 +94,70 @@ class FoodViewModel(application: Application) : AndroidViewModel(application) {
         servingSize: String,
         calories: Int,
         mealType: String,
-        barcode: String? = null
+        barcode: String? = null,
+        brandOrSupermarket: String = "Custom / Saved",
+        saveForFuture: Boolean = false
     ) {
+        val cleanName = name.trim().ifEmpty { "Food item" }
+        val cleanServing = servingSize.trim().ifEmpty { "1 serving" }
+        val cleanCalories = maxOf(0, calories)
+
         viewModelScope.launch {
             dao.insertEntry(
                 FoodEntry(
-                    name = name.trim().ifEmpty { "Food item" },
-                    servingSize = servingSize.trim().ifEmpty { "1 serving" },
-                    calories = maxOf(0, calories),
+                    name = cleanName,
+                    servingSize = cleanServing,
+                    calories = cleanCalories,
                     mealType = mealType,
                     date = System.currentTimeMillis(),
                     barcode = barcode
                 )
             )
+
+            if (saveForFuture) {
+                savedDao.insertItem(
+                    SavedFoodItem(
+                        name = cleanName,
+                        servingSize = cleanServing,
+                        calories = cleanCalories,
+                        defaultMealType = mealType,
+                        barcode = barcode,
+                        brandOrSupermarket = brandOrSupermarket
+                    )
+                )
+            }
+        }
+    }
+
+    fun saveFoodItemDirectly(
+        name: String,
+        servingSize: String,
+        calories: Int,
+        defaultMealType: String = "Snacks",
+        barcode: String? = null,
+        brandOrSupermarket: String = "Custom Saved"
+    ) {
+        val cleanName = name.trim().ifEmpty { "Food item" }
+        val cleanServing = servingSize.trim().ifEmpty { "1 serving" }
+        val cleanCalories = maxOf(0, calories)
+
+        viewModelScope.launch {
+            savedDao.insertItem(
+                SavedFoodItem(
+                    name = cleanName,
+                    servingSize = cleanServing,
+                    calories = cleanCalories,
+                    defaultMealType = defaultMealType,
+                    barcode = barcode,
+                    brandOrSupermarket = brandOrSupermarket
+                )
+            )
+        }
+    }
+
+    fun deleteSavedFoodItem(item: SavedFoodItem) {
+        viewModelScope.launch {
+            savedDao.deleteItem(item)
         }
     }
 
@@ -115,6 +171,25 @@ class FoodViewModel(application: Application) : AndroidViewModel(application) {
         _barcodeLookupState.value = BarcodeLookupState.Loading
         viewModelScope.launch {
             try {
+                // First check if user already saved this barcode locally!
+                val localSaved = savedDao.getByBarcode(barcode)
+                if (localSaved != null) {
+                    val result = FoodSearchResult(
+                        id = "saved_${localSaved.id}",
+                        name = localSaved.name,
+                        brandOrSupermarket = localSaved.brandOrSupermarket,
+                        category = localSaved.defaultMealType,
+                        caloriesPerServing = localSaved.calories,
+                        servingSize = localSaved.servingSize,
+                        caloriesPer100g = localSaved.calories,
+                        barcode = barcode,
+                        isUkSupermarket = true
+                    )
+                    _barcodeLookupState.value = BarcodeLookupState.Success(result)
+                    onResult(result)
+                    return@launch
+                }
+
                 val result = repository.lookupBarcode(barcode)
                 if (result != null) {
                     _barcodeLookupState.value = BarcodeLookupState.Success(result)

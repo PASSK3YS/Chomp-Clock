@@ -99,6 +99,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         db.fastSessionDao().deleteAll()
         db.weightEntryDao().deleteAll()
         db.foodEntryDao().deleteAll()
+        db.savedFoodItemDao().deleteAll()
         repository.resetAllPreferences()
         onComplete()
     }
