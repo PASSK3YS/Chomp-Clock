@@ -77,13 +77,19 @@ fun FoodScreen(
 
     var scannedProductToConfirm by remember { mutableStateOf<FoodSearchResult?>(null) }
     var scannedFallbackBarcode by remember { mutableStateOf<String?>(null) }
+    var showCalorieGoalDialog by remember { mutableStateOf(false) }
 
     val username = userPrefs?.username ?: "User"
     val avatarId = userPrefs?.avatarId
     val gender = userPrefs?.gender ?: "Male"
     val heightCm = userPrefs?.heightCm ?: 170f
     val latestWeight = weightEntries.firstOrNull()?.weightKg ?: 70f
-    val targetDailyCalories = weightViewModel.calculateDailyCalories(latestWeight, heightCm, 30, gender)
+    val calculatedBmr = weightViewModel.calculateDailyCalories(latestWeight, heightCm, 30, gender)
+    val targetDailyCalories = if (userPrefs?.useCustomCalories == true && (userPrefs.customDailyCalories) > 0) {
+        userPrefs.customDailyCalories
+    } else {
+        calculatedBmr
+    }
 
     val calendar = Calendar.getInstance()
     val greeting = when (calendar.get(Calendar.HOUR_OF_DAY)) {
@@ -183,6 +189,21 @@ fun FoodScreen(
         )
     }
 
+    if (showCalorieGoalDialog) {
+        EditCalorieGoalDialog(
+            currentUseCustom = userPrefs?.useCustomCalories ?: false,
+            currentCustomCalories = userPrefs?.customDailyCalories ?: 2000,
+            calculatedBmr = calculatedBmr,
+            onDismiss = { showCalorieGoalDialog = false },
+            onSave = { useCustom, calories ->
+                settingsViewModel.updateUseCustomCalories(useCustom)
+                settingsViewModel.updateCustomDailyCalories(calories)
+                showCalorieGoalDialog = false
+                Toast.makeText(context, "Calorie budget updated!", Toast.LENGTH_SHORT).show()
+            }
+        )
+    }
+
     // Filter today's entries
     val todayCal = Calendar.getInstance().apply {
         set(Calendar.HOUR_OF_DAY, 0)
@@ -270,7 +291,9 @@ fun FoodScreen(
             shape = RoundedCornerShape(16.dp),
             color = Color(0xFF18181B),
             border = BorderStroke(1.dp, Color(0xFF27272A)),
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { showCalorieGoalDialog = true }
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Row(
@@ -279,13 +302,29 @@ fun FoodScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column {
-                        Text(
-                            "DAILY CALORIE BUDGET",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Color(0xFF71717A),
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = 1.2.sp
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                "DAILY CALORIE BUDGET",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color(0xFF71717A),
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 1.2.sp
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = if (userPrefs?.useCustomCalories == true) Color(0xFF3B82F6).copy(alpha = 0.25f) else Color(0xFF27272A),
+                                border = BorderStroke(1.dp, if (userPrefs?.useCustomCalories == true) Color(0xFF3B82F6) else Color(0xFF3F3F46))
+                            ) {
+                                Text(
+                                    text = if (userPrefs?.useCustomCalories == true) "CUSTOM" else "AUTO BMR",
+                                    color = if (userPrefs?.useCustomCalories == true) Color(0xFF60A5FA) else Color(0xFFA1A1AA),
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
                         Spacer(modifier = Modifier.height(2.dp))
                         Row(verticalAlignment = Alignment.Bottom) {
                             Text(
@@ -303,13 +342,22 @@ fun FoodScreen(
                         }
                     }
                     Column(horizontalAlignment = Alignment.End) {
-                        Text(
-                            "REMAINING",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Color(0xFF71717A),
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = 1.sp
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                "REMAINING",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color(0xFF71717A),
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 1.sp
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Icon(
+                                Icons.Default.Tune,
+                                contentDescription = "Edit Calorie Goal",
+                                tint = Color(0xFF60A5FA),
+                                modifier = Modifier.size(14.dp)
+                            )
+                        }
                         Text(
                             "$remainingCalories kcal",
                             color = if (totalCaloriesConsumed > targetDailyCalories) Color(0xFFF87171) else Color(0xFF34D399),
@@ -1221,5 +1269,197 @@ fun getSupermarketBrandColor(brand: String): Color {
         brand.contains("Cadbury", ignoreCase = true) -> Color(0xFFA78BFA) // Purple
         brand.contains("Greggs", ignoreCase = true) -> Color(0xFF38BDF8) // Blue/Yellow
         else -> Color(0xFF94A3B8)
+    }
+}
+
+@Composable
+fun EditCalorieGoalDialog(
+    currentUseCustom: Boolean,
+    currentCustomCalories: Int,
+    calculatedBmr: Int,
+    onDismiss: () -> Unit,
+    onSave: (Boolean, Int) -> Unit
+) {
+    var useCustom by remember { mutableStateOf(currentUseCustom) }
+    var calorieInput by remember { mutableStateOf(currentCustomCalories.toString()) }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = RoundedCornerShape(20.dp),
+            color = Color(0xFF18181B),
+            border = BorderStroke(1.dp, Color(0xFF27272A)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(20.dp)) {
+                Text(
+                    text = "SET DAILY CALORIE GOAL",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFFA1A1AA),
+                    letterSpacing = 1.2.sp
+                )
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Mode 1: Auto BMR
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = if (!useCustom) Color(0xFF3B82F6).copy(alpha = 0.18f) else Color(0xFF27272A),
+                    border = BorderStroke(
+                        1.dp,
+                        if (!useCustom) Color(0xFF3B82F6) else Color(0xFF3F3F46)
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { useCustom = false }
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text(
+                                "Auto-Calculated BMR / TDEE",
+                                color = if (!useCustom) Color(0xFF60A5FA) else Color.White,
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 13.sp
+                            )
+                            Text(
+                                "$calculatedBmr kcal / day (Mifflin-St Jeor formula)",
+                                color = Color(0xFF71717A),
+                                fontSize = 11.sp
+                            )
+                        }
+                        RadioButton(
+                            selected = !useCustom,
+                            onClick = { useCustom = false },
+                            colors = RadioButtonDefaults.colors(
+                                selectedColor = Color(0xFF3B82F6),
+                                unselectedColor = Color(0xFF71717A)
+                            )
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Mode 2: Custom Daily Calories
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = if (useCustom) Color(0xFF3B82F6).copy(alpha = 0.18f) else Color(0xFF27272A),
+                    border = BorderStroke(
+                        1.dp,
+                        if (useCustom) Color(0xFF3B82F6) else Color(0xFF3F3F46)
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { useCustom = true }
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column {
+                                Text(
+                                    "Custom Daily Target",
+                                    color = if (useCustom) Color(0xFF60A5FA) else Color.White,
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 13.sp
+                                )
+                                Text(
+                                    "Manually define your daily calorie ceiling",
+                                    color = Color(0xFF71717A),
+                                    fontSize = 11.sp
+                                )
+                            }
+                            RadioButton(
+                                selected = useCustom,
+                                onClick = { useCustom = true },
+                                colors = RadioButtonDefaults.colors(
+                                    selectedColor = Color(0xFF3B82F6),
+                                    unselectedColor = Color(0xFF71717A)
+                                )
+                            )
+                        }
+
+                        if (useCustom) {
+                            Spacer(modifier = Modifier.height(10.dp))
+                            OutlinedTextField(
+                                value = calorieInput,
+                                onValueChange = { input ->
+                                    if (input.all { it.isDigit() } && input.length <= 5) {
+                                        calorieInput = input
+                                    }
+                                },
+                                label = { Text("Daily Target (kcal)") },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = Color(0xFF3B82F6),
+                                    unfocusedBorderColor = Color(0xFF3F3F46),
+                                    focusedContainerColor = Color(0xFF27272A),
+                                    unfocusedContainerColor = Color(0xFF27272A)
+                                )
+                            )
+
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                listOf(1500, 1800, 2000, 2200, 2500).forEach { preset ->
+                                    val isSelected = calorieInput == preset.toString()
+                                    Surface(
+                                        shape = RoundedCornerShape(6.dp),
+                                        color = if (isSelected) Color(0xFF3B82F6) else Color(0xFF27272A),
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clickable { calorieInput = preset.toString() }
+                                    ) {
+                                        Box(
+                                            contentAlignment = Alignment.Center,
+                                            modifier = Modifier.padding(vertical = 6.dp)
+                                        ) {
+                                            Text(
+                                                text = "$preset",
+                                                color = if (isSelected) Color.White else Color(0xFFA1A1AA),
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(onClick = onDismiss) {
+                        Text("Cancel", color = Color(0xFFA1A1AA))
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(
+                        onClick = {
+                            val parsed = calorieInput.toIntOrNull() ?: 2000
+                            onSave(useCustom, if (parsed > 0) parsed else 2000)
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3B82F6)),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Text("Save Goal", fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
     }
 }

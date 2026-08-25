@@ -65,6 +65,8 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun updateSoundsEnabled(sounds: Boolean) = viewModelScope.launch { repository.updateSoundsEnabled(sounds) }
     fun updateProfilePicUri(uri: String?) = viewModelScope.launch { repository.updateProfilePicUri(uri) }
     fun updateAvatarId(avatarId: String) = viewModelScope.launch { repository.updateAvatarId(avatarId) }
+    fun updateUseCustomCalories(enabled: Boolean) = viewModelScope.launch { repository.updateUseCustomCalories(enabled) }
+    fun updateCustomDailyCalories(calories: Int) = viewModelScope.launch { repository.updateCustomDailyCalories(calories) }
     
     fun deleteDeviceData(onComplete: () -> Unit = {}) = viewModelScope.launch {
         db.fastSessionDao().deleteAll()

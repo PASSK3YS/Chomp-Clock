@@ -41,6 +41,8 @@ class UserPreferencesRepository(private val context: Context) {
             val soundsEnabled = preferences[SOUNDS_ENABLED] ?: true
             val profilePicUri = preferences[PROFILE_PIC_URI]
             val avatarId = preferences[AVATAR_ID] ?: "icon:🔥"
+            val useCustomCalories = preferences[USE_CUSTOM_CALORIES] ?: false
+            val customDailyCalories = preferences[CUSTOM_DAILY_CALORIES] ?: 2000
             
             UserPreferences(
                 username = username,
@@ -51,7 +53,9 @@ class UserPreferencesRepository(private val context: Context) {
                 useDarkTheme = useDarkTheme,
                 soundsEnabled = soundsEnabled,
                 profilePicUri = profilePicUri,
-                avatarId = avatarId
+                avatarId = avatarId,
+                useCustomCalories = useCustomCalories,
+                customDailyCalories = customDailyCalories
             )
         }
 
@@ -65,6 +69,14 @@ class UserPreferencesRepository(private val context: Context) {
 
     suspend fun updateGender(gender: String) {
         dataStore.edit { it[GENDER] = gender }
+    }
+
+    suspend fun updateUseCustomCalories(enabled: Boolean) {
+        dataStore.edit { it[USE_CUSTOM_CALORIES] = enabled }
+    }
+
+    suspend fun updateCustomDailyCalories(calories: Int) {
+        dataStore.edit { it[CUSTOM_DAILY_CALORIES] = calories }
     }
 
     suspend fun updateWeightUnit(unit: WeightUnit) {
@@ -129,6 +141,8 @@ class UserPreferencesRepository(private val context: Context) {
         val SOUNDS_ENABLED = booleanPreferencesKey("sounds_enabled")
         val PROFILE_PIC_URI = stringPreferencesKey("profile_pic_uri")
         val AVATAR_ID = stringPreferencesKey("avatar_id")
+        val USE_CUSTOM_CALORIES = booleanPreferencesKey("use_custom_calories")
+        val CUSTOM_DAILY_CALORIES = intPreferencesKey("custom_daily_calories")
     }
 }
 
@@ -141,5 +155,7 @@ data class UserPreferences(
     val useDarkTheme: Boolean = true,
     val soundsEnabled: Boolean = true,
     val profilePicUri: String? = null,
-    val avatarId: String = "icon:🔥"
+    val avatarId: String = "icon:🔥",
+    val useCustomCalories: Boolean = false,
+    val customDailyCalories: Int = 2000
 )

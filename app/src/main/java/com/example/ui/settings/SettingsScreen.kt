@@ -43,6 +43,7 @@ fun SettingsScreen(
     val p = userPrefs ?: UserPreferences("User", 170f, "Male", WeightUnit.KG, false, true, true)
     var editName by remember(p.username) { mutableStateOf(p.username) }
     var editHeight by remember(p.heightCm) { mutableStateOf(if (p.heightCm > 0) p.heightCm.toInt().toString() else "") }
+    var customCaloriesInput by remember(p.customDailyCalories) { mutableStateOf(p.customDailyCalories.toString()) }
 
     var showAvatarPicker by remember { mutableStateOf(false) }
     var showDeleteConfirmDialog by remember { mutableStateOf(false) }
@@ -379,7 +380,186 @@ fun SettingsScreen(
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // 3. APP PREFERENCES
+        // 3. DAILY CALORIE INTAKE & BUDGET
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(18.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF18181B)),
+            border = BorderStroke(1.dp, Color(0xFF27272A))
+        ) {
+            Column(modifier = Modifier.padding(18.dp)) {
+                Text(
+                    text = "DAILY CALORIE BUDGET",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color(0xFF71717A),
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.sp
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = "Configure how your daily calorie goal is determined:",
+                    color = Color(0xFFA1A1AA),
+                    fontSize = 13.sp
+                )
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Option 1: Automatic BMR/TDEE
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = if (!p.useCustomCalories) Color(0xFF3B82F6).copy(alpha = 0.18f) else Color(0xFF27272A),
+                    border = BorderStroke(
+                        1.5.dp,
+                        if (!p.useCustomCalories) Color(0xFF3B82F6) else Color(0xFF3F3F46).copy(alpha = 0.5f)
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { viewModel.updateUseCustomCalories(false) }
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Auto-Calculate (BMR / TDEE)",
+                                color = if (!p.useCustomCalories) Color(0xFF60A5FA) else Color.White,
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 14.sp
+                            )
+                            Text(
+                                text = "Uses Mifflin-St Jeor formula based on weight, height, and gender",
+                                color = Color(0xFF71717A),
+                                fontSize = 12.sp
+                            )
+                        }
+                        RadioButton(
+                            selected = !p.useCustomCalories,
+                            onClick = { viewModel.updateUseCustomCalories(false) },
+                            colors = RadioButtonDefaults.colors(
+                                selectedColor = Color(0xFF3B82F6),
+                                unselectedColor = Color(0xFF71717A)
+                            )
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Option 2: Custom Daily Calories
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = if (p.useCustomCalories) Color(0xFF3B82F6).copy(alpha = 0.18f) else Color(0xFF27272A),
+                    border = BorderStroke(
+                        1.5.dp,
+                        if (p.useCustomCalories) Color(0xFF3B82F6) else Color(0xFF3F3F46).copy(alpha = 0.5f)
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { viewModel.updateUseCustomCalories(true) }
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Custom Daily Calorie Target",
+                                    color = if (p.useCustomCalories) Color(0xFF60A5FA) else Color.White,
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 14.sp
+                                )
+                                Text(
+                                    text = "Set your own fixed target (e.g. 1500 - 3000 kcal/day)",
+                                    color = Color(0xFF71717A),
+                                    fontSize = 12.sp
+                                )
+                            }
+                            RadioButton(
+                                selected = p.useCustomCalories,
+                                onClick = { viewModel.updateUseCustomCalories(true) },
+                                colors = RadioButtonDefaults.colors(
+                                    selectedColor = Color(0xFF3B82F6),
+                                    unselectedColor = Color(0xFF71717A)
+                                )
+                            )
+                        }
+
+                        if (p.useCustomCalories) {
+                            Spacer(modifier = Modifier.height(12.dp))
+                            OutlinedTextField(
+                                value = customCaloriesInput,
+                                onValueChange = { input ->
+                                    if (input.all { it.isDigit() } && input.length <= 5) {
+                                        customCaloriesInput = input
+                                        input.toIntOrNull()?.let { cal ->
+                                            if (cal > 0) {
+                                                viewModel.updateCustomDailyCalories(cal)
+                                            }
+                                        }
+                                    }
+                                },
+                                label = { Text("Daily Calorie Goal (kcal)") },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = Color(0xFF3B82F6),
+                                    unfocusedBorderColor = Color(0xFF3F3F46),
+                                    focusedContainerColor = Color(0xFF27272A),
+                                    unfocusedContainerColor = Color(0xFF27272A)
+                                )
+                            )
+
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            Text("Quick Targets:", color = Color(0xFF71717A), fontSize = 11.sp, fontWeight = FontWeight.Medium)
+                            Spacer(modifier = Modifier.height(6.dp))
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                listOf(1500, 1800, 2000, 2200, 2500).forEach { preset ->
+                                    val isCurrent = p.customDailyCalories == preset
+                                    Surface(
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = if (isCurrent) Color(0xFF3B82F6) else Color(0xFF27272A),
+                                        border = BorderStroke(1.dp, if (isCurrent) Color(0xFF60A5FA) else Color(0xFF3F3F46)),
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clickable {
+                                                customCaloriesInput = preset.toString()
+                                                viewModel.updateCustomDailyCalories(preset)
+                                            }
+                                    ) {
+                                        Box(
+                                            contentAlignment = Alignment.Center,
+                                            modifier = Modifier.padding(vertical = 8.dp)
+                                        ) {
+                                            Text(
+                                                text = "$preset",
+                                                color = if (isCurrent) Color.White else Color(0xFFA1A1AA),
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        // 4. APP PREFERENCES
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(18.dp),
@@ -786,8 +966,18 @@ fun SettingsScreen(
 
         Spacer(modifier = Modifier.height(28.dp))
         Text(
-            text = "Chomp Clock • GitHub PASSK3YS/Chomp-Clock",
+            text = "Chomp Clock - v1.0.0",
             modifier = Modifier.align(Alignment.CenterHorizontally),
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = Color(0xFFA1A1AA),
+            textAlign = TextAlign.Center
+        )
+        Text(
+            text = "GitHub PASSK3YS/Chomp-Clock",
+            modifier = Modifier
+                .align(Alignment.CenterHorizontally)
+                .padding(top = 4.dp),
             style = MaterialTheme.typography.bodySmall,
             color = Color(0xFF71717A),
             textAlign = TextAlign.Center

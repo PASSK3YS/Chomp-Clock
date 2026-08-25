@@ -47,6 +47,7 @@ fun FastingScreen(
     var showAchievementsDialog by remember { mutableStateOf(false) }
     var showCustomFastDialog by remember { mutableStateOf(false) }
     var showAvatarPicker by remember { mutableStateOf(false) }
+    var showMetabolicStatesDialog by remember { mutableStateOf(false) }
 
     val username = userPrefs?.username ?: "User"
     val avatarId = userPrefs?.avatarId
@@ -56,6 +57,14 @@ fun FastingScreen(
         in 0..11 -> "Good morning"
         in 12..16 -> "Good afternoon"
         else -> "Good evening"
+    }
+
+    if (showMetabolicStatesDialog) {
+        val currentHours = if (isFasting) (elapsed / (1000f * 3600f)) else null
+        MetabolicStateGuideDialog(
+            hoursElapsed = currentHours,
+            onDismiss = { showMetabolicStatesDialog = false }
+        )
     }
 
     if (showCustomFastDialog) {
@@ -270,7 +279,8 @@ fun FastingScreen(
             ) {
                 MetabolicStageBox(
                     hoursElapsed = (totalSeconds / 3600f),
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
+                    onClick = { showMetabolicStatesDialog = true }
                 )
                 Surface(
                     modifier = Modifier.weight(1f),
@@ -298,6 +308,14 @@ fun FastingScreen(
                     }
                 }
             }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Metabolic Progression Card
+            MetabolicProgressionBar(
+                hoursElapsed = (totalSeconds / 3600f),
+                onClick = { showMetabolicStatesDialog = true }
+            )
 
             Spacer(modifier = Modifier.weight(1f))
 
@@ -387,7 +405,12 @@ fun FastingScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Metabolic States & Science Section
+            MetabolicSciencePreviewCard(onClick = { showMetabolicStatesDialog = true })
+
+            Spacer(modifier = Modifier.height(14.dp))
 
             Text(
                 "RECENT FASTS",
@@ -489,43 +512,246 @@ fun FastingScreen(
 }
 
 @Composable
-fun MetabolicStageBox(hoursElapsed: Float, modifier: Modifier = Modifier) {
-    val (stage, subtitle) = when {
-        hoursElapsed < 2 -> Pair("Blood Sugar Rising", "Insulin response active")
-        hoursElapsed < 4 -> "Blood Sugar Dropping" to "Digestion completing"
-        hoursElapsed < 8 -> "Fat Burning" to "Liver glycogen depleted"
-        hoursElapsed < 14 -> "Ketosis" to "Ketone bodies rising"
-        hoursElapsed < 24 -> "Deep Ketosis" to "Fat oxidation peak"
-        else -> "Autophagy" to "Cellular cleanup & renewal"
-    }
+fun MetabolicStageBox(
+    hoursElapsed: Float,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit = {}
+) {
+    val stage = FastingMetabolicStages.getCurrentStage(hoursElapsed)
 
     Surface(
-        modifier = modifier,
+        modifier = modifier.clickable { onClick() },
         color = Color(0xFF18181B),
         shape = RoundedCornerShape(16.dp),
-        border = BorderStroke(1.dp, Color(0xFF27272A))
+        border = BorderStroke(1.dp, stage.accentColor.copy(alpha = 0.5f))
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
-            Text(
-                "METABOLIC STATE",
-                color = Color(0xFF71717A),
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 1.sp
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "METABOLIC STATE",
+                    color = Color(0xFF71717A),
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.sp
+                )
+                Text(stage.icon, fontSize = 12.sp)
+            }
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                stage,
-                color = Color(0xFF60A5FA),
+                stage.title,
+                color = stage.accentColor,
                 fontWeight = FontWeight.SemiBold,
-                style = MaterialTheme.typography.bodyMedium
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 1
             )
             Text(
-                subtitle,
+                "Fuel: ${stage.primaryFuelSource.take(24)}...",
                 color = Color(0xFF71717A),
                 fontSize = 10.sp,
                 maxLines = 1
             )
+        }
+    }
+}
+
+@Composable
+fun MetabolicProgressionBar(
+    hoursElapsed: Float,
+    onClick: () -> Unit
+) {
+    val currentStage = FastingMetabolicStages.getCurrentStage(hoursElapsed)
+
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() },
+        shape = RoundedCornerShape(16.dp),
+        color = Color(0xFF18181B),
+        border = BorderStroke(1.dp, Color(0xFF27272A))
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("🧬", fontSize = 14.sp)
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        "METABOLIC MILESTONES",
+                        color = Color(0xFF71717A),
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.sp
+                    )
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        "Guide & Science",
+                        color = Color(0xFF60A5FA),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Spacer(modifier = Modifier.width(2.dp))
+                    Icon(
+                        Icons.Default.PlayArrow,
+                        contentDescription = null,
+                        tint = Color(0xFF60A5FA),
+                        modifier = Modifier.size(12.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Stage pill timeline
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                FastingMetabolicStages.ALL_STAGES.forEach { stage ->
+                    val isPast = stage.hourEnd != null && hoursElapsed >= stage.hourEnd
+                    val isCurrent = currentStage.id == stage.id
+
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = when {
+                            isCurrent -> stage.accentColor.copy(alpha = 0.25f)
+                            isPast -> Color(0xFF064E3B)
+                            else -> Color(0xFF27272A)
+                        },
+                        border = BorderStroke(
+                            1.dp,
+                            when {
+                                isCurrent -> stage.accentColor
+                                isPast -> Color(0xFF059669)
+                                else -> Color(0xFF3F3F46)
+                            }
+                        ),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(vertical = 4.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = stage.icon,
+                                fontSize = 10.sp
+                            )
+                            Text(
+                                text = "${stage.hourStart.toInt()}h",
+                                color = when {
+                                    isCurrent -> stage.accentColor
+                                    isPast -> Color(0xFF34D399)
+                                    else -> Color(0xFF71717A)
+                                },
+                                fontSize = 8.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun MetabolicSciencePreviewCard(
+    onClick: () -> Unit
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() },
+        shape = RoundedCornerShape(16.dp),
+        color = Color(0xFF18181B),
+        border = BorderStroke(1.dp, Color(0xFF3B82F6).copy(alpha = 0.4f))
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Surface(
+                        shape = CircleShape,
+                        color = Color(0xFF3B82F6).copy(alpha = 0.2f),
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text("🧬", fontSize = 14.sp)
+                        }
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Column {
+                        Text(
+                            "METABOLIC STATES & SCIENCE",
+                            color = Color(0xFF60A5FA),
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.sp
+                        )
+                        Text(
+                            "7 Stages of Fasting Physiology",
+                            color = Color.White,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = Color(0xFF3B82F6),
+                    modifier = Modifier.padding(start = 4.dp)
+                ) {
+                    Text(
+                        "Learn",
+                        color = Color.White,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            Text(
+                "Track how your body shifts from Digestion (0-4h) to Glycogen Burn, Fat Burning, Ketosis (12-18h), Autophagy (18-24h), and Stem Cell Reset (48h+).",
+                color = Color(0xFFA1A1AA),
+                fontSize = 11.sp,
+                lineHeight = 15.sp
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                listOf("🍎 0-4h", "⚡ 4-8h", "🔥 8-12h", "✨ 12-18h", "🔄 18-24h", "🧬 24-48h", "🌱 48h+").forEach { badge ->
+                    Surface(
+                        shape = RoundedCornerShape(4.dp),
+                        color = Color(0xFF27272A)
+                    ) {
+                        Text(
+                            text = badge,
+                            color = Color(0xFFD4D4D8),
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Medium,
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+            }
         }
     }
 }
