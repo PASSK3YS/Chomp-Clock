@@ -13,8 +13,14 @@ interface FoodEntryDao {
     @Query("SELECT * FROM food_entries ORDER BY date DESC")
     fun getAllEntries(): Flow<List<FoodEntry>>
 
+    @Query("SELECT * FROM food_entries ORDER BY date DESC")
+    suspend fun getAllDirect(): List<FoodEntry>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertEntry(entry: FoodEntry)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(entries: List<FoodEntry>)
 
     @Delete
     suspend fun deleteEntry(entry: FoodEntry)

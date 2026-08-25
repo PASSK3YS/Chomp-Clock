@@ -3,6 +3,8 @@ package com.example.ui.settings
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -27,10 +29,15 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.BuildConfig
 import com.example.data.repository.UserPreferences
 import com.example.data.repository.WeightUnit
 import com.example.ui.components.AvatarPickerDialog
 import com.example.ui.components.UserAvatarView
+import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @Composable
 fun SettingsScreen(
@@ -38,7 +45,9 @@ fun SettingsScreen(
     viewModel: SettingsViewModel = viewModel()
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val updateCheckState by viewModel.updateCheckState.collectAsState()
+    val isBackingUp by viewModel.isBackingUp.collectAsState()
 
     val p = userPrefs ?: UserPreferences("User", 170f, "Male", WeightUnit.KG, false, true, true)
     var editName by remember(p.username) { mutableStateOf(p.username) }
@@ -48,6 +57,51 @@ fun SettingsScreen(
     var showAvatarPicker by remember { mutableStateOf(false) }
     var showDeleteConfirmDialog by remember { mutableStateOf(false) }
     var showWhatsNewDialog by remember { mutableStateOf(false) }
+
+    // Export & Import State
+    var pendingExportPayload by remember { mutableStateOf<String?>(null) }
+    var pendingImportUri by remember { mutableStateOf<Uri?>(null) }
+    var showImportConfirmDialog by remember { mutableStateOf(false) }
+    var backupResultSummary by remember { mutableStateOf<String?>(null) }
+
+    val jsonExportLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/json")
+    ) { uri ->
+        if (uri != null && pendingExportPayload != null) {
+            viewModel.exportToFileUri(uri, pendingExportPayload!!) { success ->
+                pendingExportPayload = null
+                if (success) {
+                    Toast.makeText(context, "JSON backup exported successfully!", Toast.LENGTH_LONG).show()
+                } else {
+                    Toast.makeText(context, "Export failed. Please try again.", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+
+    val csvExportLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("text/csv")
+    ) { uri ->
+        if (uri != null && pendingExportPayload != null) {
+            viewModel.exportToFileUri(uri, pendingExportPayload!!) { success ->
+                pendingExportPayload = null
+                if (success) {
+                    Toast.makeText(context, "CSV spreadsheet exported successfully!", Toast.LENGTH_LONG).show()
+                } else {
+                    Toast.makeText(context, "Export failed. Please try again.", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+
+    val jsonImportLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        if (uri != null) {
+            pendingImportUri = uri
+            showImportConfirmDialog = true
+        }
+    }
 
     if (showAvatarPicker) {
         AvatarPickerDialog(
@@ -110,6 +164,107 @@ fun SettingsScreen(
                     border = BorderStroke(1.dp, Color(0xFF3F3F46))
                 ) {
                     Text("Cancel")
+                }
+            },
+            containerColor = Color(0xFF18181B)
+        )
+    }
+
+    if (showImportConfirmDialog && pendingImportUri != null) {
+        AlertDialog(
+            onDismissRequest = {
+                showImportConfirmDialog = false
+                pendingImportUri = null
+            },
+            icon = {
+                Icon(
+                    imageVector = Icons.Default.CloudUpload,
+                    contentDescription = null,
+                    tint = Color(0xFF3B82F6),
+                    modifier = Modifier.size(36.dp)
+                )
+            },
+            title = {
+                Text(
+                    text = "Import JSON Backup",
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                    fontSize = 18.sp
+                )
+            },
+            text = {
+                Text(
+                    text = "How would you like to restore this backup file?\n\n• Merge: Adds all fasting sessions, food logs, and weights to your existing data.\n• Replace: Clears current logs and replaces them with the backup.",
+                    color = Color(0xFFA1A1AA),
+                    fontSize = 13.sp
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val uri = pendingImportUri ?: return@Button
+                        showImportConfirmDialog = false
+                        viewModel.importFromJsonUri(uri, clearExisting = false) { result ->
+                            pendingImportUri = null
+                            backupResultSummary = result.message
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3B82F6)),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Text("Merge Data", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(
+                        onClick = {
+                            val uri = pendingImportUri ?: return@TextButton
+                            showImportConfirmDialog = false
+                            viewModel.importFromJsonUri(uri, clearExisting = true) { result ->
+                                pendingImportUri = null
+                                backupResultSummary = result.message
+                            }
+                        }
+                    ) {
+                        Text("Replace Data", color = Color(0xFFEF4444), fontWeight = FontWeight.SemiBold)
+                    }
+                    OutlinedButton(
+                        onClick = {
+                            showImportConfirmDialog = false
+                            pendingImportUri = null
+                        },
+                        shape = RoundedCornerShape(10.dp),
+                        border = BorderStroke(1.dp, Color(0xFF3F3F46)),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
+                    ) {
+                        Text("Cancel")
+                    }
+                }
+            },
+            containerColor = Color(0xFF18181B)
+        )
+    }
+
+    if (backupResultSummary != null) {
+        AlertDialog(
+            onDismissRequest = { backupResultSummary = null },
+            icon = {
+                Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color(0xFF34D399), modifier = Modifier.size(36.dp))
+            },
+            title = {
+                Text("Backup Restore Status", fontWeight = FontWeight.Bold, color = Color.White)
+            },
+            text = {
+                Text(backupResultSummary ?: "", color = Color(0xFFA1A1AA), fontSize = 14.sp)
+            },
+            confirmButton = {
+                Button(
+                    onClick = { backupResultSummary = null },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3B82F6)),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Text("Done", fontWeight = FontWeight.Bold)
                 }
             },
             containerColor = Color(0xFF18181B)
@@ -621,7 +776,202 @@ fun SettingsScreen(
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // 4. GITHUB RELEASES & APP UPDATE CHECKER (Connected to https://github.com/PASSK3YS/Chomp-Clock/releases)
+        // 5. DATA BACKUP, EXPORT & IMPORT (.JSON / .CSV)
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(18.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF18181B)),
+            border = BorderStroke(1.dp, Color(0xFF27272A))
+        ) {
+            Column(modifier = Modifier.padding(18.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "DATA BACKUP & EXPORT",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color(0xFF71717A),
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.sp
+                    )
+                    Surface(
+                        shape = RoundedCornerShape(50),
+                        color = Color(0xFF1E293B),
+                        border = BorderStroke(1.dp, Color(0xFF334155))
+                    ) {
+                        Text(
+                            text = ".JSON / .CSV",
+                            color = Color(0xFF60A5FA),
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = "Safely backup, transfer, or export your fasting sessions, food logs, and weight telemetry.",
+                    color = Color(0xFFA1A1AA),
+                    fontSize = 12.sp
+                )
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Action 1: Export .JSON
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = Color(0xFF27272A),
+                    border = BorderStroke(1.dp, Color(0xFF3F3F46)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(enabled = !isBackingUp) {
+                            scope.launch {
+                                val json = viewModel.getJsonExportData()
+                                pendingExportPayload = json
+                                val timeStamp = SimpleDateFormat("yyyyMMdd_HHmm", Locale.getDefault()).format(Date())
+                                jsonExportLauncher.launch("chomp_clock_backup_$timeStamp.json")
+                            }
+                        }
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = Color(0xFF3B82F6).copy(alpha = 0.2f),
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(Icons.Default.DataObject, contentDescription = null, tint = Color(0xFF60A5FA), modifier = Modifier.size(20.dp))
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Export as .JSON Backup", color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                            Text("Complete archive of fasting, foods & settings", color = Color(0xFF71717A), fontSize = 11.sp)
+                        }
+                        Icon(Icons.Default.FileDownload, contentDescription = null, tint = Color(0xFF60A5FA), modifier = Modifier.size(18.dp))
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Action 2: Export .CSV
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = Color(0xFF27272A),
+                    border = BorderStroke(1.dp, Color(0xFF3F3F46)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(enabled = !isBackingUp) {
+                            scope.launch {
+                                val csv = viewModel.getCsvExportData()
+                                pendingExportPayload = csv
+                                val timeStamp = SimpleDateFormat("yyyyMMdd_HHmm", Locale.getDefault()).format(Date())
+                                csvExportLauncher.launch("chomp_clock_spreadsheet_$timeStamp.csv")
+                            }
+                        }
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = Color(0xFF10B981).copy(alpha = 0.2f),
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(Icons.Default.TableChart, contentDescription = null, tint = Color(0xFF34D399), modifier = Modifier.size(20.dp))
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Export as .CSV Spreadsheet", color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                            Text("Compatible with Excel, Google Sheets, & Numbers", color = Color(0xFF71717A), fontSize = 11.sp)
+                        }
+                        Icon(Icons.Default.FileDownload, contentDescription = null, tint = Color(0xFF34D399), modifier = Modifier.size(18.dp))
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Action 3: Import .JSON
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = Color(0xFF27272A),
+                    border = BorderStroke(1.dp, Color(0xFF3F3F46)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(enabled = !isBackingUp) {
+                            jsonImportLauncher.launch("application/json")
+                        }
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = Color(0xFFA855F7).copy(alpha = 0.2f),
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(Icons.Default.CloudUpload, contentDescription = null, tint = Color(0xFFC084FC), modifier = Modifier.size(20.dp))
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Import via .JSON Backup", color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                            Text("Restore previous fasts, food logs & weights", color = Color(0xFF71717A), fontSize = 11.sp)
+                        }
+                        Icon(Icons.Default.FileUpload, contentDescription = null, tint = Color(0xFFC084FC), modifier = Modifier.size(18.dp))
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Action 4: Quick Share
+                OutlinedButton(
+                    onClick = {
+                        scope.launch {
+                            val json = viewModel.getJsonExportData()
+                            val sendIntent: Intent = Intent().apply {
+                                action = Intent.ACTION_SEND
+                                putExtra(Intent.EXTRA_TEXT, json)
+                                type = "text/plain"
+                                putExtra(Intent.EXTRA_TITLE, "Chomp Clock Data Backup")
+                            }
+                            val shareIntent = Intent.createChooser(sendIntent, "Share Chomp Clock Backup")
+                            context.startActivity(shareIntent)
+                        }
+                    },
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF60A5FA)),
+                    border = BorderStroke(1.dp, Color(0xFF3F3F46))
+                ) {
+                    Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Quick Share Backup Text", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        // 6. GITHUB RELEASES & APP UPDATE CHECKER (Connected to https://github.com/PASSK3YS/Chomp-Clock/releases)
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(18.dp),
@@ -914,12 +1264,13 @@ fun SettingsScreen(
                             .background(Color(0xFF27272A).copy(alpha = 0.5f), RoundedCornerShape(10.dp))
                             .padding(12.dp)
                     ) {
+                        Text("• v1.1.1: Interactive 7-Stage Metabolic Science & Biomarker Telemetry Guide", color = Color(0xFFA1A1AA), fontSize = 12.sp)
+                        Text("• v1.1.1: Streamlined compact Fasting Dashboard layout", color = Color(0xFFA1A1AA), fontSize = 12.sp)
+                        Text("• v1.1.1: GitHub Actions CI build & release workflow fixes", color = Color(0xFFA1A1AA), fontSize = 12.sp)
                         Text("• UK Supermarket Food Database (Tesco, Sainsbury's, ASDA, M&S, Morrisons, Aldi, Lidl)", color = Color(0xFFA1A1AA), fontSize = 12.sp)
                         Text("• UK Barcode scanning with instant product nutrition autofill", color = Color(0xFFA1A1AA), fontSize = 12.sp)
-                        Text("• GitHub Releases Integration with automated APK build workflow", color = Color(0xFFA1A1AA), fontSize = 12.sp)
                         Text("• Stone & Pounds (st & lbs), Pounds, and KG unit switcher", color = Color(0xFFA1A1AA), fontSize = 12.sp)
-                        Text("• Custom fasting range menu with hour and minute pickers", color = Color(0xFFA1A1AA), fontSize = 12.sp)
-                        Text("• Persistent 5-category daily meal board (Breakfast, Lunch, Dinner, Snacks, Drinks)", color = Color(0xFFA1A1AA), fontSize = 12.sp)
+                        Text("• Custom fasting duration picker with hours and minutes", color = Color(0xFFA1A1AA), fontSize = 12.sp)
                     }
                 }
             }
@@ -966,7 +1317,7 @@ fun SettingsScreen(
 
         Spacer(modifier = Modifier.height(28.dp))
         Text(
-            text = "Chomp Clock - v1.1.0",
+            text = "Chomp Clock - v${BuildConfig.VERSION_NAME}",
             modifier = Modifier.align(Alignment.CenterHorizontally),
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.SemiBold,

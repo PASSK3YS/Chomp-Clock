@@ -8,6 +8,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Star
@@ -383,7 +384,7 @@ fun FastingScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
             // Custom Fast Button
             Surface(
@@ -416,12 +417,12 @@ fun FastingScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
-            // Metabolic States & Science Section
+            // Metabolic States & Science Section (Compact Information Card)
             MetabolicSciencePreviewCard(onClick = { showMetabolicStatesDialog = true })
 
-            Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
             Text(
                 "RECENT FASTS",
@@ -694,87 +695,71 @@ fun MetabolicSciencePreviewCard(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onClick() },
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(14.dp),
         color = Color(0xFF18181B),
-        border = BorderStroke(1.dp, Color(0xFF3B82F6).copy(alpha = 0.4f))
+        border = BorderStroke(1.dp, Color(0xFF3B82F6).copy(alpha = 0.35f))
     ) {
-        Column(modifier = Modifier.padding(14.dp)) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.weight(1f)
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Surface(
-                        shape = CircleShape,
-                        color = Color(0xFF3B82F6).copy(alpha = 0.2f),
-                        modifier = Modifier.size(28.dp)
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Text("🧬", fontSize = 14.sp)
-                        }
-                    }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Column {
-                        Text(
-                            "METABOLIC STATES & SCIENCE",
-                            color = Color(0xFF60A5FA),
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = 1.sp
-                        )
-                        Text(
-                            "7 Stages of Fasting Physiology",
-                            color = Color.White,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold
-                        )
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = Color(0xFF3B82F6).copy(alpha = 0.15f),
+                    border = BorderStroke(1.dp, Color(0xFF3B82F6).copy(alpha = 0.35f)),
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text("🧬", fontSize = 17.sp)
                     }
                 }
-
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = Color(0xFF3B82F6),
-                    modifier = Modifier.padding(start = 4.dp)
-                ) {
+                Spacer(modifier = Modifier.width(10.dp))
+                Column {
                     Text(
-                        "Learn",
-                        color = Color.White,
-                        fontSize = 11.sp,
+                        "METABOLIC STATES GUIDE",
+                        color = Color(0xFF60A5FA),
+                        fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        letterSpacing = 0.8.sp
+                    )
+                    Text(
+                        "7 Stages • Biomarkers & Science",
+                        color = Color(0xFFE4E4E7),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
-
-            Text(
-                "Track how your body shifts from Digestion (0-4h) to Glycogen Burn, Fat Burning, Ketosis (12-18h), Autophagy (18-24h), and Stem Cell Reset (48h+).",
-                color = Color(0xFFA1A1AA),
-                fontSize = 11.sp,
-                lineHeight = 15.sp
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            Surface(
+                shape = RoundedCornerShape(8.dp),
+                color = Color(0xFF1E293B),
+                border = BorderStroke(1.dp, Color(0xFF334155))
             ) {
-                listOf("🍎 0-4h", "⚡ 4-8h", "🔥 8-12h", "✨ 12-18h", "🔄 18-24h", "🧬 24-48h", "🌱 48h+").forEach { badge ->
-                    Surface(
-                        shape = RoundedCornerShape(4.dp),
-                        color = Color(0xFF27272A)
-                    ) {
-                        Text(
-                            text = badge,
-                            color = Color(0xFFD4D4D8),
-                            fontSize = 9.sp,
-                            fontWeight = FontWeight.Medium,
-                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
-                        )
-                    }
+                Row(
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        "Guide",
+                        color = Color(0xFF60A5FA),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.width(3.dp))
+                    Icon(
+                        Icons.AutoMirrored.Filled.ArrowForward,
+                        contentDescription = "Open Guide",
+                        tint = Color(0xFF60A5FA),
+                        modifier = Modifier.size(13.dp)
+                    )
                 }
             }
         }

@@ -14,12 +14,14 @@ import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -51,6 +53,7 @@ fun BarcodeScannerScreen(
         )
     }
     var manualBarcode by remember { mutableStateOf("") }
+    var hasHandledScan by remember { mutableStateOf(false) }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
@@ -87,13 +90,18 @@ fun BarcodeScannerScreen(
                             .also {
                                 it.setAnalyzer(cameraExecutor) { imageProxy ->
                                     val mediaImage = imageProxy.image
-                                    if (mediaImage != null) {
+                                    if (mediaImage != null && !hasHandledScan) {
                                         val image = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
                                         barcodeScanner.process(image)
                                             .addOnSuccessListener { barcodes ->
-                                                for (barcode in barcodes) {
-                                                    barcode.rawValue?.let { value ->
-                                                        onBarcodeScanned(value)
+                                                if (!hasHandledScan) {
+                                                    for (barcode in barcodes) {
+                                                        barcode.rawValue?.let { value ->
+                                                            if (value.isNotBlank() && !hasHandledScan) {
+                                                                hasHandledScan = true
+                                                                onBarcodeScanned(value.trim())
+                                                            }
+                                                        }
                                                     }
                                                 }
                                             }
@@ -126,6 +134,21 @@ fun BarcodeScannerScreen(
                 },
                 modifier = Modifier.fillMaxSize()
             )
+
+            // Reticle Target Box for clear scanning UI
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(bottom = 120.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(280.dp, 160.dp)
+                        .border(2.dp, Color(0xFF3B82F6), RoundedCornerShape(16.dp))
+                        .background(Color.Black.copy(alpha = 0.15f), RoundedCornerShape(16.dp))
+                )
+            }
         }
 
         // Top bar with close button
@@ -139,7 +162,7 @@ fun BarcodeScannerScreen(
         ) {
             Surface(
                 shape = CircleShape,
-                color = Color.Black.copy(alpha = 0.6f)
+                color = Color.Black.copy(alpha = 0.65f)
             ) {
                 IconButton(onClick = onClose) {
                     Icon(Icons.Default.Close, contentDescription = "Close Scanner", tint = Color.White)
@@ -147,15 +170,26 @@ fun BarcodeScannerScreen(
             }
             Surface(
                 shape = RoundedCornerShape(50),
-                color = Color.Black.copy(alpha = 0.6f)
+                color = Color.Black.copy(alpha = 0.65f)
             ) {
-                Text(
-                    text = "Point camera at food barcode",
-                    color = Color.White,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Medium,
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
-                )
+                Row(
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Default.QrCodeScanner,
+                        contentDescription = null,
+                        tint = Color(0xFF60A5FA),
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "Point camera at food barcode",
+                        color = Color.White,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
             }
         }
 
@@ -163,6 +197,7 @@ fun BarcodeScannerScreen(
         Surface(
             shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
             color = Color(0xFF18181B),
+            border = BorderStroke(1.dp, Color(0xFF27272A)),
             modifier = Modifier
                 .fillMaxWidth()
                 .align(Alignment.BottomCenter)
@@ -173,9 +208,10 @@ fun BarcodeScannerScreen(
                     .navigationBarsPadding()
             ) {
                 Text(
-                    text = "Or enter barcode numbers manually",
+                    text = "Or enter UK barcode numbers manually",
                     color = Color(0xFFA1A1AA),
-                    fontSize = 13.sp
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Row(
@@ -185,26 +221,30 @@ fun BarcodeScannerScreen(
                     OutlinedTextField(
                         value = manualBarcode,
                         onValueChange = { manualBarcode = it },
-                        placeholder = { Text("e.g. 737628064502") },
+                        placeholder = { Text("e.g. 5000157024671", color = Color(0xFF71717A)) },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        singleLine = true,
                         modifier = Modifier.weight(1f),
                         colors = OutlinedTextFieldDefaults.colors(
                             unfocusedContainerColor = Color(0xFF27272A),
                             focusedContainerColor = Color(0xFF27272A),
                             unfocusedBorderColor = Color(0xFF3F3F46),
-                            focusedBorderColor = Color(0xFF3B82F6)
+                            focusedBorderColor = Color(0xFF3B82F6),
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White
                         )
                     )
                     Button(
                         onClick = {
-                            if (manualBarcode.isNotBlank()) {
+                            if (manualBarcode.isNotBlank() && !hasHandledScan) {
+                                hasHandledScan = true
                                 onBarcodeScanned(manualBarcode.trim())
                             }
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3B82F6)),
                         shape = RoundedCornerShape(12.dp)
                     ) {
-                        Text("Submit")
+                        Text("Search", fontWeight = FontWeight.Bold)
                     }
                 }
             }

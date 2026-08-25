@@ -13,8 +13,14 @@ interface FastSessionDao {
     @Query("SELECT * FROM fast_sessions ORDER BY startTime DESC")
     fun getAllSessions(): Flow<List<FastSession>>
 
+    @Query("SELECT * FROM fast_sessions ORDER BY startTime DESC")
+    suspend fun getAllDirect(): List<FastSession>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertSession(session: FastSession)
+    
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(sessions: List<FastSession>)
     
     @Delete
     suspend fun deleteSession(session: FastSession)

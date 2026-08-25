@@ -55,7 +55,7 @@ val ALL_MEAL_CATEGORIES = listOf(
 )
 
 val UK_SUPERMARKET_CHIPS = listOf(
-    "All", "Tesco", "Sainsbury's", "ASDA", "M&S", "Morrisons", "Aldi/Lidl", "UK Brands"
+    "All", "Cereals", "Dinner Combos", "Snacks & Drinks", "Tesco", "Sainsbury's", "ASDA", "M&S", "Morrisons", "Aldi/Lidl", "UK Brands"
 )
 
 @Composable

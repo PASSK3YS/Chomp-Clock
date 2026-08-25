@@ -1,12 +1,15 @@
 package com.example.ui.settings
 
 import android.app.Application
+import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.BuildConfig
 import com.example.data.local.AppDatabase
 import com.example.data.remote.GitHubReleaseResponse
 import com.example.data.remote.GitHubService
+import com.example.data.repository.BackupImportResult
+import com.example.data.repository.DataBackupManager
 import com.example.data.repository.UserPreferences
 import com.example.data.repository.UserPreferencesRepository
 import com.example.data.repository.WeightUnit
@@ -49,12 +52,16 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     private val repository = UserPreferencesRepository(application)
     private val db = AppDatabase.getDatabase(application)
     private val gitHubService = GitHubService.create()
+    val backupManager = DataBackupManager(application)
     
     val userPrefs: StateFlow<UserPreferences?> = repository.userPreferencesFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     private val _updateCheckState = MutableStateFlow<UpdateCheckState>(UpdateCheckState.Idle)
     val updateCheckState: StateFlow<UpdateCheckState> = _updateCheckState.asStateFlow()
+
+    private val _isBackingUp = MutableStateFlow(false)
+    val isBackingUp: StateFlow<Boolean> = _isBackingUp.asStateFlow()
 
     fun updateUsername(name: String) = viewModelScope.launch { repository.updateUsername(name) }
     fun updateHeight(cm: Float) = viewModelScope.launch { repository.updateHeight(cm) }
@@ -74,6 +81,32 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         db.foodEntryDao().deleteAll()
         repository.resetAllPreferences()
         onComplete()
+    }
+
+    suspend fun getJsonExportData(): String {
+        return backupManager.generateJsonBackup()
+    }
+
+    suspend fun getCsvExportData(): String {
+        return backupManager.generateCsvBackup()
+    }
+
+    fun exportToFileUri(uri: Uri, content: String, onResult: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            _isBackingUp.value = true
+            val success = backupManager.writeContentToUri(uri, content)
+            _isBackingUp.value = false
+            onResult(success)
+        }
+    }
+
+    fun importFromJsonUri(uri: Uri, clearExisting: Boolean, onResult: (BackupImportResult) -> Unit) {
+        viewModelScope.launch {
+            _isBackingUp.value = true
+            val result = backupManager.importFromJsonUri(uri, clearExisting)
+            _isBackingUp.value = false
+            onResult(result)
+        }
     }
 
     fun checkForUpdates() {

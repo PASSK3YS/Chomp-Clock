@@ -13,8 +13,14 @@ interface WeightEntryDao {
     @Query("SELECT * FROM weight_entries ORDER BY date DESC")
     fun getAllEntries(): Flow<List<WeightEntry>>
 
+    @Query("SELECT * FROM weight_entries ORDER BY date DESC")
+    suspend fun getAllDirect(): List<WeightEntry>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertEntry(entry: WeightEntry)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(entries: List<WeightEntry>)
 
     @Delete
     suspend fun deleteEntry(entry: WeightEntry)
