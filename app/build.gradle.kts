@@ -53,7 +53,7 @@ android {
     buildConfig = true
   }
   composeOptions {
-    kotlinCompilerExtensionVersion = "2.2.10"
+    kotlinCompilerExtensionVersion = "1.5.14"
   }
   testOptions { unitTests { isIncludeAndroidResources = true } }
   dependenciesInfo {
