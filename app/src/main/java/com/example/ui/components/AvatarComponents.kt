@@ -1,5 +1,6 @@
 package com.example.ui.components
 
+import android.content.Context
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -27,12 +28,14 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import coil.compose.AsyncImage
+import java.io.File
 
 val PRESET_AVATARS = listOf(
     "icon:🔥", "icon:⚡", "icon:🦊", "icon:🦁",
@@ -59,10 +62,20 @@ fun UserAvatarView(
         shadowElevation = 4.dp
     ) {
         Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-            if (avatarId != null && avatarId.startsWith("uri:")) {
-                val uriString = avatarId.removePrefix("uri:")
+            if (avatarId != null && (avatarId.startsWith("uri:") || avatarId.startsWith("file:") || avatarId.startsWith("/"))) {
+                val raw = avatarId.removePrefix("uri:")
+                val model: Any = if (raw.startsWith("file://")) {
+                    val path = raw.removePrefix("file://").substringBefore("?")
+                    File(path)
+                } else if (raw.startsWith("/")) {
+                    val path = raw.substringBefore("?")
+                    File(path)
+                } else {
+                    Uri.parse(raw)
+                }
+
                 AsyncImage(
-                    model = Uri.parse(uriString),
+                    model = model,
                     contentDescription = "User Avatar",
                     modifier = Modifier
                         .fillMaxSize()
@@ -95,11 +108,24 @@ fun AvatarPickerDialog(
     onDismiss: () -> Unit,
     onAvatarSelected: (String) -> Unit
 ) {
+    val context = LocalContext.current
     val photoPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
     ) { uri: Uri? ->
         if (uri != null) {
-            onAvatarSelected("uri:$uri")
+            try {
+                // Permanently persist the picked image file in the app internal storage
+                val avatarFile = File(context.filesDir, "user_avatar_custom.jpg")
+                context.contentResolver.openInputStream(uri)?.use { input ->
+                    avatarFile.outputStream().use { output ->
+                        input.copyTo(output)
+                    }
+                }
+                val persistentUri = "file://${avatarFile.absolutePath}?t=${System.currentTimeMillis()}"
+                onAvatarSelected(persistentUri)
+            } catch (e: Exception) {
+                onAvatarSelected("uri:$uri")
+            }
             onDismiss()
         }
     }

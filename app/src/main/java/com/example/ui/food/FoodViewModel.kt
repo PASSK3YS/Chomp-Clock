@@ -129,6 +129,62 @@ class FoodViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun copyEntryToToday(entry: FoodEntry) {
+        viewModelScope.launch {
+            dao.insertEntry(
+                FoodEntry(
+                    name = entry.name,
+                    servingSize = entry.servingSize,
+                    calories = entry.calories,
+                    mealType = entry.mealType,
+                    date = System.currentTimeMillis(),
+                    barcode = entry.barcode
+                )
+            )
+        }
+    }
+
+    fun addFoodEntryForDate(
+        name: String,
+        servingSize: String,
+        calories: Int,
+        mealType: String,
+        dateMillis: Long,
+        barcode: String? = null,
+        brandOrSupermarket: String = "Custom / Saved",
+        saveForFuture: Boolean = false
+    ) {
+        val cleanName = name.trim().ifEmpty { "Food item" }
+        val cleanServing = servingSize.trim().ifEmpty { "1 serving" }
+        val cleanCalories = maxOf(0, calories)
+
+        viewModelScope.launch {
+            dao.insertEntry(
+                FoodEntry(
+                    name = cleanName,
+                    servingSize = cleanServing,
+                    calories = cleanCalories,
+                    mealType = mealType,
+                    date = dateMillis,
+                    barcode = barcode
+                )
+            )
+
+            if (saveForFuture) {
+                savedDao.insertItem(
+                    SavedFoodItem(
+                        name = cleanName,
+                        servingSize = cleanServing,
+                        calories = cleanCalories,
+                        defaultMealType = mealType,
+                        barcode = barcode,
+                        brandOrSupermarket = brandOrSupermarket
+                    )
+                )
+            }
+        }
+    }
+
     fun saveFoodItemDirectly(
         name: String,
         servingSize: String,

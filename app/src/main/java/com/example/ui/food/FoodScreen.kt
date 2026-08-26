@@ -1,7 +1,9 @@
 package com.example.ui.food
 
+import android.app.DatePickerDialog
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
@@ -17,6 +19,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.LocalContext
@@ -45,6 +48,7 @@ import com.example.util.WeightTrajectory
 import com.example.util.WeightUtils
 import java.text.SimpleDateFormat
 import java.util.*
+import kotlin.math.abs
 
 val UK_SUPERMARKET_CHIPS = listOf("All", "Tesco", "Sainsbury's", "ASDA", "M&S", "Morrisons", "Aldi/Lidl", "Cereals", "Dinner Combos", "Snacks & Drinks", "UK Brands")
 
@@ -83,6 +87,18 @@ fun FoodScreen(
     // Scanned product dialog state
     var scannedProductToConfirm by remember { mutableStateOf<FoodSearchResult?>(null) }
     var scannedFallbackBarcode by remember { mutableStateOf<String?>(null) }
+
+    // Food History Selected Date State (Defaults to yesterday)
+    var historySelectedDateMillis by remember {
+        val cal = Calendar.getInstance().apply {
+            add(Calendar.DAY_OF_YEAR, -1)
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+        mutableStateOf(cal.timeInMillis)
+    }
 
     val username = userPrefs?.username ?: "User"
     val avatarId = userPrefs?.avatarId
@@ -654,6 +670,28 @@ fun FoodScreen(
 
             item {
                 Spacer(modifier = Modifier.height(16.dp))
+                FoodHistorySection(
+                    entries = entries,
+                    selectedDateMillis = historySelectedDateMillis,
+                    targetDailyCalories = targetDailyCalories,
+                    onSelectDate = { historySelectedDateMillis = it },
+                    onCopyItemToToday = { item ->
+                        viewModel.copyEntryToToday(item)
+                        Toast.makeText(context, "Copied \"${item.name}\" to today's log!", Toast.LENGTH_SHORT).show()
+                    },
+                    onDeleteItem = { item ->
+                        viewModel.deleteFoodEntry(item)
+                        Toast.makeText(context, "Removed \"${item.name}\"", Toast.LENGTH_SHORT).show()
+                    },
+                    onLogNewForDate = { mealName, date ->
+                        selectedMealForAdd = mealName
+                        showFoodSearchDialog = true
+                    }
+                )
+            }
+
+            item {
+                Spacer(modifier = Modifier.height(28.dp))
             }
         }
     }
@@ -745,6 +783,530 @@ fun FoodItemRow(
                         contentDescription = "Delete food entry",
                         tint = AppTheme.colors.textMuted,
                         modifier = Modifier.size(17.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun FoodHistorySection(
+    entries: List<FoodEntry>,
+    selectedDateMillis: Long,
+    targetDailyCalories: Int,
+    onSelectDate: (Long) -> Unit,
+    onCopyItemToToday: (FoodEntry) -> Unit,
+    onDeleteItem: (FoodEntry) -> Unit,
+    onLogNewForDate: (String, Long) -> Unit
+) {
+    val context = LocalContext.current
+    val fullDateFmt = SimpleDateFormat("EEEE, d MMMM yyyy", Locale.getDefault())
+    val shortDateFmt = SimpleDateFormat("EEE d MMM", Locale.getDefault())
+    val dayOnlyFmt = SimpleDateFormat("d MMM", Locale.getDefault())
+
+    // Normalize selected date to midnight
+    val selectedCal = Calendar.getInstance().apply {
+        timeInMillis = selectedDateMillis
+        set(Calendar.HOUR_OF_DAY, 0)
+        set(Calendar.MINUTE, 0)
+        set(Calendar.SECOND, 0)
+        set(Calendar.MILLISECOND, 0)
+    }
+    val startOfDay = selectedCal.timeInMillis
+    val endOfDay = startOfDay + 86400000L - 1L
+
+    // Filter items for selected historical date
+    val dayItems = entries.filter { it.date in startOfDay..endOfDay }
+    val dayTotalCalories = dayItems.sumOf { it.calories }
+
+    // Group items by meal category
+    val breakfastItems = dayItems.filter { it.mealType.equals("Breakfast", true) }
+    val lunchItems = dayItems.filter { it.mealType.equals("Lunch", true) }
+    val dinnerItems = dayItems.filter { it.mealType.equals("Dinner", true) }
+    val snacksItems = dayItems.filter { it.mealType.equals("Snacks", true) || it.mealType.equals("Snack", true) }
+    val drinksItems = dayItems.filter { it.mealType.equals("Drinks", true) || it.mealType.equals("Drink", true) }
+
+    // Generate recent 7 past days for quick tabs
+    val recentPastDays = remember {
+        (1..7).map { daysAgo ->
+            val c = Calendar.getInstance().apply {
+                add(Calendar.DAY_OF_YEAR, -daysAgo)
+                set(Calendar.HOUR_OF_DAY, 0)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }
+            c.timeInMillis
+        }
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = AppTheme.colors.surface),
+        border = BorderStroke(1.dp, AppTheme.colors.border)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            // Header
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("📅", fontSize = 18.sp)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Column {
+                        Text(
+                            text = "FOOD LOG HISTORY",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.2.sp,
+                            color = AppTheme.colors.textMuted
+                        )
+                        Text(
+                            text = "Browse what you ate on past days",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = AppTheme.colors.textSecondary,
+                            fontSize = 11.sp
+                        )
+                    }
+                }
+
+                Surface(
+                    shape = RoundedCornerShape(6.dp),
+                    color = AppTheme.colors.primary.copy(alpha = 0.15f),
+                    border = BorderStroke(1.dp, AppTheme.colors.primary.copy(alpha = 0.3f))
+                ) {
+                    Text(
+                        text = "${dayItems.size} items",
+                        color = AppTheme.colors.primary,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Date Navigation Bar (< Date Selector >)
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = AppTheme.colors.surfaceElevated,
+                border = BorderStroke(1.dp, AppTheme.colors.border),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 6.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(
+                        onClick = {
+                            val prevCal = Calendar.getInstance().apply {
+                                timeInMillis = startOfDay
+                                add(Calendar.DAY_OF_YEAR, -1)
+                            }
+                            onSelectDate(prevCal.timeInMillis)
+                        },
+                        modifier = Modifier.size(34.dp)
+                    ) {
+                        Icon(Icons.Default.ChevronLeft, contentDescription = "Previous Day", tint = AppTheme.colors.textPrimary)
+                    }
+
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = AppTheme.colors.primary.copy(alpha = 0.15f),
+                        border = BorderStroke(1.dp, AppTheme.colors.primary.copy(alpha = 0.4f)),
+                        modifier = Modifier.clickable {
+                            val cur = Calendar.getInstance().apply { timeInMillis = startOfDay }
+                            DatePickerDialog(
+                                context,
+                                { _, y, m, d ->
+                                    val newCal = Calendar.getInstance().apply {
+                                        set(y, m, d, 0, 0, 0)
+                                    }
+                                    onSelectDate(newCal.timeInMillis)
+                                },
+                                cur.get(Calendar.YEAR),
+                                cur.get(Calendar.MONTH),
+                                cur.get(Calendar.DAY_OF_MONTH)
+                            ).show()
+                        }
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                        ) {
+                            Icon(Icons.Default.CalendarMonth, contentDescription = null, tint = AppTheme.colors.primary, modifier = Modifier.size(15.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = fullDateFmt.format(Date(startOfDay)),
+                                color = AppTheme.colors.textPrimary,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp
+                            )
+                        }
+                    }
+
+                    val todayMidnight = Calendar.getInstance().apply {
+                        set(Calendar.HOUR_OF_DAY, 0)
+                        set(Calendar.MINUTE, 0)
+                        set(Calendar.SECOND, 0)
+                        set(Calendar.MILLISECOND, 0)
+                    }.timeInMillis
+
+                    val canGoNext = startOfDay < todayMidnight
+
+                    IconButton(
+                        onClick = {
+                            if (canGoNext) {
+                                val nextCal = Calendar.getInstance().apply {
+                                    timeInMillis = startOfDay
+                                    add(Calendar.DAY_OF_YEAR, 1)
+                                }
+                                onSelectDate(nextCal.timeInMillis)
+                            }
+                        },
+                        enabled = canGoNext,
+                        modifier = Modifier.size(34.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.ChevronRight,
+                            contentDescription = "Next Day",
+                            tint = if (canGoNext) AppTheme.colors.textPrimary else AppTheme.colors.textMuted.copy(alpha = 0.4f)
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Quick Past Days Carousel
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                recentPastDays.forEachIndexed { idx, dayMillis ->
+                    val isSelected = (dayMillis in startOfDay..endOfDay)
+                    val label = if (idx == 0) "Yesterday" else shortDateFmt.format(Date(dayMillis))
+                    val hasFood = entries.any { it.date in dayMillis..(dayMillis + 86400000L - 1L) }
+
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = if (isSelected) AppTheme.colors.primary.copy(alpha = 0.22f) else AppTheme.colors.surfaceElevated,
+                        border = BorderStroke(1.dp, if (isSelected) AppTheme.colors.primary else AppTheme.colors.border),
+                        modifier = Modifier.clickable { onSelectDate(dayMillis) }
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                        ) {
+                            if (hasFood) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(6.dp)
+                                        .clip(CircleShape)
+                                        .background(AppTheme.colors.success)
+                                )
+                                Spacer(modifier = Modifier.width(5.dp))
+                            }
+                            Text(
+                                text = label,
+                                color = if (isSelected) AppTheme.colors.primary else AppTheme.colors.textSecondary,
+                                fontSize = 11.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Historical Day Summary Card
+            Surface(
+                shape = RoundedCornerShape(14.dp),
+                color = AppTheme.colors.surfaceElevated,
+                border = BorderStroke(1.dp, AppTheme.colors.border),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text(
+                                text = "TOTAL CONSUMED",
+                                color = AppTheme.colors.textMuted,
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 0.8.sp
+                            )
+                            Row(verticalAlignment = Alignment.Bottom) {
+                                Text(
+                                    text = "$dayTotalCalories",
+                                    color = AppTheme.colors.textPrimary,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 18.sp
+                                )
+                                Text(
+                                    text = " / $targetDailyCalories kcal",
+                                    color = AppTheme.colors.textSecondary,
+                                    fontSize = 11.sp,
+                                    modifier = Modifier.padding(bottom = 2.dp, start = 4.dp)
+                                )
+                            }
+                        }
+
+                        val diff = dayTotalCalories - targetDailyCalories
+                        val isOver = diff > 0
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = (if (isOver) AppTheme.colors.danger else AppTheme.colors.success).copy(alpha = 0.15f)
+                        ) {
+                            Text(
+                                text = if (dayTotalCalories == 0) "No calories" else if (isOver) "+$diff kcal over" else "${abs(diff)} kcal under",
+                                color = if (isOver) AppTheme.colors.danger else AppTheme.colors.success,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+                            )
+                        }
+                    }
+
+                    if (dayTotalCalories > 0) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            val brkCal = breakfastItems.sumOf { it.calories }
+                            val lunCal = lunchItems.sumOf { it.calories }
+                            val dinCal = dinnerItems.sumOf { it.calories }
+                            val snkCal = snacksItems.sumOf { it.calories }
+                            val drkCal = drinksItems.sumOf { it.calories }
+
+                            MiniMealChip("🍳 Brk", brkCal, Color(0xFFFB923C), Modifier.weight(1f))
+                            MiniMealChip("🥗 Lun", lunCal, AppTheme.colors.success, Modifier.weight(1f))
+                            MiniMealChip("🍲 Din", dinCal, AppTheme.colors.primary, Modifier.weight(1f))
+                            MiniMealChip("🥨 Snk", snkCal, Color(0xFFA78BFA), Modifier.weight(1f))
+                            MiniMealChip("💧 Drk", drkCal, Color(0xFF38BDF8), Modifier.weight(1f))
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Food Items List for that Past Day
+            if (dayItems.isEmpty()) {
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = AppTheme.colors.surfaceElevated.copy(alpha = 0.5f),
+                    border = BorderStroke(1.dp, AppTheme.colors.border),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(18.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.RestaurantMenu,
+                            contentDescription = null,
+                            tint = AppTheme.colors.textMuted,
+                            modifier = Modifier.size(28.dp)
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = "No meals logged on ${dayOnlyFmt.format(Date(startOfDay))}",
+                            color = AppTheme.colors.textSecondary,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+                        OutlinedButton(
+                            onClick = { onLogNewForDate("Breakfast", startOfDay) },
+                            shape = RoundedCornerShape(8.dp),
+                            border = BorderStroke(1.dp, AppTheme.colors.primary.copy(alpha = 0.5f)),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = AppTheme.colors.primary)
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(15.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Log Food For This Date", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            } else {
+                Text(
+                    text = "LOGGED ITEMS (${dayItems.size})",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = AppTheme.colors.textMuted,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.8.sp
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    dayItems.forEach { item ->
+                        HistoryFoodItemRow(
+                            item = item,
+                            onCopyToday = { onCopyItemToToday(item) },
+                            onDelete = { onDeleteItem(item) }
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun MiniMealChip(label: String, calories: Int, color: Color, modifier: Modifier = Modifier) {
+    Surface(
+        shape = RoundedCornerShape(6.dp),
+        color = color.copy(alpha = 0.12f),
+        border = BorderStroke(1.dp, color.copy(alpha = 0.25f)),
+        modifier = modifier
+    ) {
+        Column(
+            modifier = Modifier.padding(vertical = 4.dp, horizontal = 2.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(label, color = color, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+            Text("${calories}k", color = AppTheme.colors.textPrimary, fontSize = 9.sp)
+        }
+    }
+}
+
+@Composable
+fun HistoryFoodItemRow(
+    item: FoodEntry,
+    onCopyToday: () -> Unit,
+    onDelete: () -> Unit
+) {
+    var showConfirmDelete by remember { mutableStateOf(false) }
+
+    if (showConfirmDelete) {
+        AlertDialog(
+            onDismissRequest = { showConfirmDelete = false },
+            title = { Text("Delete Past Log", color = AppTheme.colors.textPrimary, fontWeight = FontWeight.Bold) },
+            text = {
+                Text(
+                    "Remove \"${item.name}\" (${item.calories} kcal) from this past day?",
+                    color = AppTheme.colors.textSecondary,
+                    fontSize = 14.sp
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        onDelete()
+                        showConfirmDelete = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = AppTheme.colors.danger)
+                ) {
+                    Text("Delete", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showConfirmDelete = false }) {
+                    Text("Cancel", color = AppTheme.colors.textMuted)
+                }
+            },
+            containerColor = AppTheme.colors.surface,
+            shape = RoundedCornerShape(16.dp)
+        )
+    }
+
+    val mealIcon = when (item.mealType.lowercase()) {
+        "breakfast" -> "🍳"
+        "lunch" -> "🥗"
+        "dinner" -> "🍲"
+        "drinks", "drink" -> "💧"
+        else -> "🥨"
+    }
+
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = AppTheme.colors.surfaceElevated,
+        border = BorderStroke(1.dp, AppTheme.colors.border),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                Text(mealIcon, fontSize = 16.sp)
+                Spacer(modifier = Modifier.width(10.dp))
+                Column {
+                    Text(
+                        text = item.name,
+                        color = AppTheme.colors.textPrimary,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 13.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = "${item.servingSize} • ${item.mealType}",
+                        color = AppTheme.colors.textMuted,
+                        fontSize = 11.sp
+                    )
+                }
+            }
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = "${item.calories} kcal",
+                    color = AppTheme.colors.success,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.sp,
+                    modifier = Modifier.padding(end = 4.dp)
+                )
+
+                // 1-Tap Copy to Today button
+                Surface(
+                    onClick = onCopyToday,
+                    shape = RoundedCornerShape(8.dp),
+                    color = AppTheme.colors.primary.copy(alpha = 0.15f),
+                    border = BorderStroke(1.dp, AppTheme.colors.primary.copy(alpha = 0.35f)),
+                    modifier = Modifier.size(30.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Default.ContentCopy,
+                            contentDescription = "Copy to Today's log",
+                            tint = AppTheme.colors.primary,
+                            modifier = Modifier.size(15.dp)
+                        )
+                    }
+                }
+
+                IconButton(
+                    onClick = { showConfirmDelete = true },
+                    modifier = Modifier.size(30.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.DeleteOutline,
+                        contentDescription = "Delete entry",
+                        tint = AppTheme.colors.textMuted,
+                        modifier = Modifier.size(16.dp)
                     )
                 }
             }
