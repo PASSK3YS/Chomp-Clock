@@ -2,11 +2,13 @@ package com.example.ui.settings
 
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -689,9 +691,9 @@ fun SettingsScreen(
 
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     val themeOptions = listOf(
-                        Triple(ThemeMode.DARK, "🌙 Dark Mode", "AMOLED deep black with high contrast vibrant neon accents"),
-                        Triple(ThemeMode.LIGHT, "☀️ Light Mode", "Clean, bright slate interface with ultra-readable dark text"),
-                        Triple(ThemeMode.SYSTEM, "📱 System Default", "Automatically match your Android device system setting")
+                        Triple(ThemeMode.DARK, "🌙 Dark Mode", "Deep Material You dark palette with ambient tonal surfaces"),
+                        Triple(ThemeMode.LIGHT, "☀️ Light Mode", "Bright Material You daylight palette with crisp high-contrast surfaces"),
+                        Triple(ThemeMode.SYSTEM, "📱 System Default", "Follows your Android device's day/night system theme")
                     )
 
                     themeOptions.forEach { (mode, title, desc) ->
@@ -736,6 +738,132 @@ fun SettingsScreen(
                                         unselectedColor = AppTheme.colors.textMuted
                                     )
                                 )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Material You Dynamic Color Toggle
+                Surface(
+                    shape = RoundedCornerShape(14.dp),
+                    color = AppTheme.colors.surfaceElevated,
+                    border = BorderStroke(1.dp, AppTheme.colors.border),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(14.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Surface(
+                                    shape = CircleShape,
+                                    color = AppTheme.colors.primary.copy(alpha = 0.15f),
+                                    modifier = Modifier.size(38.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Text(text = "🎨", fontSize = 18.sp)
+                                    }
+                                }
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(
+                                            text = "Material You Dynamic Color",
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 14.sp,
+                                            color = AppTheme.colors.textPrimary
+                                        )
+                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Surface(
+                                                shape = RoundedCornerShape(4.dp),
+                                                color = AppTheme.colors.primary.copy(alpha = 0.2f)
+                                            ) {
+                                                Text(
+                                                    text = "Monet",
+                                                    fontSize = 10.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = AppTheme.colors.primary,
+                                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                                                )
+                                            }
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
+                                            "Derives adaptive tones directly from your device wallpaper & palette"
+                                        else
+                                            "Applies harmonious Google Material Design 3 dynamic color tokens",
+                                        fontSize = 12.sp,
+                                        color = AppTheme.colors.textSecondary
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Switch(
+                                checked = p.dynamicColor,
+                                onCheckedChange = { viewModel.updateDynamicColor(it) },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = AppTheme.colors.surface,
+                                    checkedTrackColor = AppTheme.colors.primary,
+                                    uncheckedThumbColor = AppTheme.colors.textMuted,
+                                    uncheckedTrackColor = AppTheme.colors.surfaceHighlight
+                                )
+                            )
+                        }
+
+                        // Live Palette Swatches Preview
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            text = "ACTIVE PALETTE PREVIEW",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontSize = 10.sp,
+                            color = AppTheme.colors.textMuted,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            val swatches = listOf(
+                                "Primary" to AppTheme.colors.primary,
+                                "Container" to AppTheme.colors.primaryVariant,
+                                "Secondary" to AppTheme.colors.secondary,
+                                "Tertiary" to AppTheme.colors.tertiary,
+                                "Surface" to AppTheme.colors.surfaceElevated
+                            )
+                            swatches.forEach { (name, color) ->
+                                Column(
+                                    modifier = Modifier.weight(1f),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(width = 44.dp, height = 24.dp)
+                                            .background(color, RoundedCornerShape(8.dp))
+                                            .border(1.dp, AppTheme.colors.borderLight, RoundedCornerShape(8.dp))
+                                    )
+                                    Spacer(modifier = Modifier.height(3.dp))
+                                    Text(
+                                        text = name,
+                                        fontSize = 9.sp,
+                                        color = AppTheme.colors.textMuted,
+                                        maxLines = 1
+                                    )
+                                }
                             }
                         }
                     }

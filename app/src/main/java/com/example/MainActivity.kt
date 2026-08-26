@@ -47,7 +47,8 @@ class MainActivity : ComponentActivity() {
             }
 
             MyApplicationTheme(
-                darkTheme = isDarkTheme
+                darkTheme = isDarkTheme,
+                dynamicColor = activePrefs.dynamicColor
             ) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),

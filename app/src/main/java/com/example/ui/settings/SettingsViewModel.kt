@@ -80,6 +80,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 useImperial = false,
                 themeMode = ThemeMode.DARK,
                 useDarkTheme = true,
+                dynamicColor = true,
                 soundsEnabled = true,
                 avatarId = "icon:🔥"
             )
@@ -98,6 +99,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun updateGender(gender: String) = viewModelScope.launch { repository.updateGender(gender) }
     fun updateWeightUnit(unit: WeightUnit) = viewModelScope.launch { repository.updateWeightUnit(unit) }
     fun updateThemeMode(themeMode: ThemeMode) = viewModelScope.launch { repository.updateThemeMode(themeMode) }
+    fun updateDynamicColor(dynamicColor: Boolean) = viewModelScope.launch { repository.updateDynamicColor(dynamicColor) }
     fun updateUseImperial(useImperial: Boolean) = viewModelScope.launch { repository.updateUseImperial(useImperial) }
     fun updateUseDarkTheme(darkTheme: Boolean) = viewModelScope.launch { repository.updateUseDarkTheme(darkTheme) }
     fun updateSoundsEnabled(sounds: Boolean) = viewModelScope.launch { repository.updateSoundsEnabled(sounds) }
@@ -222,13 +224,27 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun getBuiltInReleaseNotes(): List<ReleaseNoteItem> {
-        val currentVersion = BuildConfig.VERSION_NAME.ifEmpty { "1.2.0" }
+        val currentVersion = BuildConfig.VERSION_NAME.ifEmpty { "1.2.1" }
         return listOf(
             ReleaseNoteItem(
-                version = "v1.2.0",
+                version = "v1.2.1",
                 date = "Latest Verified Build (August 2026)",
-                title = "Interactive Stats Overhaul, Food History & Avatar Persistence",
+                title = "Google Material You (M3) Theming & Dynamic Color",
                 isLatestVerified = true,
+                highlights = listOf(
+                    "Google Material You dynamic color system with wallpaper-derived Monet theming (Android 12+)",
+                    "Complete Dark & Light theme mode support with harmonized M3 color tokens",
+                    "Dedicated Material You dynamic color switch and live palette preview swatches in Settings",
+                    "Material 3 bottom navigation bar styling with pill active indicators and tonal elevation",
+                    "Enhanced GitHub Actions release workflow with atomic gh release asset publishing"
+                ),
+                fullBody = "Version 1.2.1 integrates Google's Material You design system with dynamic wallpaper color adaptation, dark and light theme improvements, and optimized GitHub release workflows."
+            ),
+            ReleaseNoteItem(
+                version = "v1.2.0",
+                date = "August 2026",
+                title = "Interactive Stats Overhaul, Food History & Avatar Persistence",
+                isLatestVerified = false,
                 highlights = listOf(
                     "Interactive touch-driven graphs for Fasting, Weight, and Calorie tracking with live tooltips",
                     "Custom Date Range selector & date range filter for comprehensive health stats analysis",

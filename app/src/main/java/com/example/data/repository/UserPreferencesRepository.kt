@@ -79,6 +79,7 @@ class UserPreferencesRepository(private val context: Context) {
                 if (oldDark) ThemeMode.DARK else ThemeMode.LIGHT
             }
 
+            val dynamicColor = preferences[DYNAMIC_COLOR] ?: true
             val soundsEnabled = preferences[SOUNDS_ENABLED] ?: true
             val profilePicUri = preferences[PROFILE_PIC_URI]
             val avatarId = preferences[AVATAR_ID] ?: "icon:🔥"
@@ -95,6 +96,7 @@ class UserPreferencesRepository(private val context: Context) {
                 useImperial = useImperial,
                 themeMode = themeMode,
                 useDarkTheme = (themeMode == ThemeMode.DARK),
+                dynamicColor = dynamicColor,
                 soundsEnabled = soundsEnabled,
                 profilePicUri = profilePicUri,
                 avatarId = avatarId,
@@ -165,6 +167,10 @@ class UserPreferencesRepository(private val context: Context) {
     suspend fun updateUseDarkTheme(useDarkTheme: Boolean) {
         updateThemeMode(if (useDarkTheme) ThemeMode.DARK else ThemeMode.LIGHT)
     }
+
+    suspend fun updateDynamicColor(dynamicColor: Boolean) {
+        dataStore.edit { it[DYNAMIC_COLOR] = dynamicColor }
+    }
     
     suspend fun updateSoundsEnabled(soundsEnabled: Boolean) {
         dataStore.edit { it[SOUNDS_ENABLED] = soundsEnabled }
@@ -206,6 +212,7 @@ class UserPreferencesRepository(private val context: Context) {
         val USE_IMPERIAL = booleanPreferencesKey("use_imperial")
         val USE_DARK_THEME = booleanPreferencesKey("use_dark_theme")
         val THEME_MODE = stringPreferencesKey("theme_mode")
+        val DYNAMIC_COLOR = booleanPreferencesKey("dynamic_color")
         val SOUNDS_ENABLED = booleanPreferencesKey("sounds_enabled")
         val PROFILE_PIC_URI = stringPreferencesKey("profile_pic_uri")
         val AVATAR_ID = stringPreferencesKey("avatar_id")
@@ -224,6 +231,7 @@ data class UserPreferences(
     val useImperial: Boolean = false,
     val themeMode: ThemeMode = ThemeMode.DARK,
     val useDarkTheme: Boolean = true,
+    val dynamicColor: Boolean = true,
     val soundsEnabled: Boolean = true,
     val profilePicUri: String? = null,
     val avatarId: String = "icon:🔥",

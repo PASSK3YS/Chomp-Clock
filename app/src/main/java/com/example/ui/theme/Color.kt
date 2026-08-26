@@ -1,5 +1,6 @@
 package com.example.ui.theme
 
+import androidx.compose.material3.ColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.staticCompositionLocalOf
@@ -60,6 +61,8 @@ data class AppColorScheme(
     val textMuted: Color,
     val primary: Color,
     val primaryVariant: Color,
+    val secondary: Color = primaryVariant,
+    val tertiary: Color = primary,
     val success: Color,
     val warning: Color,
     val danger: Color,
@@ -67,44 +70,96 @@ data class AppColorScheme(
     val inputBorder: Color
 )
 
+fun createMaterialYouAppColorScheme(m3: ColorScheme, isDark: Boolean): AppColorScheme {
+    return if (isDark) {
+        AppColorScheme(
+            isDark = true,
+            background = m3.background,
+            surface = m3.surfaceContainerLow,
+            surfaceElevated = m3.surfaceContainer,
+            surfaceHighlight = m3.surfaceContainerHigh,
+            border = m3.outlineVariant.copy(alpha = 0.40f),
+            borderLight = m3.outlineVariant.copy(alpha = 0.70f),
+            textPrimary = m3.onSurface,
+            textSecondary = m3.onSurfaceVariant,
+            textMuted = m3.outline,
+            primary = m3.primary,
+            primaryVariant = m3.primaryContainer,
+            secondary = m3.secondary,
+            tertiary = m3.tertiary,
+            success = Emerald400,
+            warning = Amber400,
+            danger = m3.error,
+            inputBackground = m3.surfaceContainerHighest.copy(alpha = 0.45f),
+            inputBorder = m3.outlineVariant.copy(alpha = 0.60f)
+        )
+    } else {
+        AppColorScheme(
+            isDark = false,
+            background = m3.background,
+            surface = m3.surface,
+            surfaceElevated = m3.surfaceContainerLow,
+            surfaceHighlight = m3.surfaceContainer,
+            border = m3.outlineVariant.copy(alpha = 0.50f),
+            borderLight = m3.outlineVariant.copy(alpha = 0.85f),
+            textPrimary = m3.onSurface,
+            textSecondary = m3.onSurfaceVariant,
+            textMuted = m3.outline,
+            primary = m3.primary,
+            primaryVariant = m3.primaryContainer,
+            secondary = m3.secondary,
+            tertiary = m3.tertiary,
+            success = Emerald600,
+            warning = Amber600,
+            danger = m3.error,
+            inputBackground = m3.surfaceContainerLowest,
+            inputBorder = m3.outlineVariant.copy(alpha = 0.65f)
+        )
+    }
+}
+
 val DarkAppColorScheme = AppColorScheme(
     isDark = true,
-    background = Black,
-    surface = Zinc900,
-    surfaceElevated = Zinc800,
-    surfaceHighlight = Color(0xFF2E2E33),
-    border = Zinc800,
-    borderLight = Zinc700,
-    textPrimary = Color.White,
-    textSecondary = Zinc400,
-    textMuted = Zinc500,
-    primary = Blue500,
-    primaryVariant = Blue400,
+    background = Color(0xFF0F1419),
+    surface = Color(0xFF171C22),
+    surfaceElevated = Color(0xFF1B2026),
+    surfaceHighlight = Color(0xFF252A31),
+    border = Color(0xFF42474E).copy(alpha = 0.5f),
+    borderLight = Color(0xFF42474E),
+    textPrimary = Color(0xFFE1E2E8),
+    textSecondary = Color(0xFFC2C7CF),
+    textMuted = Color(0xFF8C9199),
+    primary = Color(0xFF96CCFF),
+    primaryVariant = Color(0xFF004B76),
+    secondary = Color(0xFFB8C8DA),
+    tertiary = Color(0xFFD2BFE7),
     success = Emerald400,
     warning = Amber400,
-    danger = Red500,
-    inputBackground = Zinc800,
-    inputBorder = Zinc700
+    danger = Color(0xFFFFB4AB),
+    inputBackground = Color(0xFF30353C).copy(alpha = 0.45f),
+    inputBorder = Color(0xFF42474E)
 )
 
 val LightAppColorScheme = AppColorScheme(
     isDark = false,
-    background = LightBackground,
-    surface = LightSurface,
-    surfaceElevated = LightSurfaceElevated,
-    surfaceHighlight = Color(0xFFE2E8F0),
-    border = LightSurfaceBorder,
-    borderLight = Color(0xFFCBD5E1),
-    textPrimary = LightTextPrimary,
-    textSecondary = LightTextSecondary,
-    textMuted = LightTextMuted,
-    primary = Blue600,
-    primaryVariant = Blue500,
+    background = Color(0xFFF7F9FF),
+    surface = Color(0xFFFFFFFF),
+    surfaceElevated = Color(0xFFF1F4FA),
+    surfaceHighlight = Color(0xFFEBEEF4),
+    border = Color(0xFFC2C7CF).copy(alpha = 0.6f),
+    borderLight = Color(0xFFC2C7CF),
+    textPrimary = Color(0xFF181C20),
+    textSecondary = Color(0xFF42474E),
+    textMuted = Color(0xFF72777F),
+    primary = Color(0xFF00639B),
+    primaryVariant = Color(0xFFCEE5FF),
+    secondary = Color(0xFF51606F),
+    tertiary = Color(0xFF67587A),
     success = Emerald600,
     warning = Amber600,
-    danger = Red600,
-    inputBackground = LightSurfaceElevated,
-    inputBorder = Color(0xFFCBD5E1)
+    danger = Color(0xFFBA1A1A),
+    inputBackground = Color(0xFFFFFFFF),
+    inputBorder = Color(0xFFC2C7CF)
 )
 
 val LocalAppColors = staticCompositionLocalOf { DarkAppColorScheme }
