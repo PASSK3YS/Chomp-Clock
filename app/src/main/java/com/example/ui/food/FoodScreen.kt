@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -44,6 +45,7 @@ import com.example.ui.settings.SettingsViewModel
 import com.example.ui.theme.AppTheme
 import com.example.ui.weight.WeightViewModel
 import com.example.util.CalorieWeightCalculator
+import com.example.util.PortionCalculator
 import com.example.util.WeightTrajectory
 import com.example.util.WeightUtils
 import java.text.SimpleDateFormat
@@ -1361,11 +1363,16 @@ fun UkFoodSearchDialog(
     var selectedSavedForPortion by remember { mutableStateOf<SavedFoodItem?>(null) }
     var savedPortionMultiplier by remember { mutableStateOf(1.0f) }
 
-    // Custom Food Tab state
+    // Custom Food Tab state (Automatic Portion & Gram Calculator)
     var customName by remember { mutableStateOf("") }
-    var customServing by remember { mutableStateOf("1 serving") }
-    var customCalories by remember { mutableStateOf("") }
-    var customBrand by remember { mutableStateOf("Custom Food") }
+    var customBrand by remember { mutableStateOf("Homemade") }
+    var customBaseGramsText by remember { mutableStateOf("100") }
+    var customBaseCaloriesText by remember { mutableStateOf("") }
+    var customServingUnit by remember { mutableStateOf("g") } // "g", "ml", "serv"
+    var customEatenGramsText by remember { mutableStateOf("100") }
+    var customMultiplier by remember { mutableStateOf(1.0f) }
+    var customServingLabelOverride by remember { mutableStateOf("") }
+    var isManualServingLabel by remember { mutableStateOf(false) }
     var saveCustomForFuture by remember { mutableStateOf(true) }
 
     Dialog(onDismissRequest = onDismiss) {
@@ -1934,17 +1941,46 @@ fun UkFoodSearchDialog(
                         }
                     }
                     2 -> {
-                        // Manual Custom Entry Tab
+                        // Manual Custom Entry Tab with Automatic Portion & Gram Calorie Scaling
+                        val baseGrams = customBaseGramsText.toFloatOrNull() ?: 100f
+                        val baseCalories = customBaseCaloriesText.toFloatOrNull() ?: 0f
+                        val eatenGrams = customEatenGramsText.toFloatOrNull() ?: baseGrams
+
+                        // Real-time automatic calorie calculation based on gram ratio or multiplier
+                        val autoCalculatedCalories = if (baseGrams > 0f && baseCalories > 0f) {
+                            PortionCalculator.calculateScaledCalories(
+                                baseCalories = baseCalories,
+                                baseGrams = baseGrams,
+                                targetGrams = eatenGrams
+                            )
+                        } else {
+                            (baseCalories * customMultiplier).toInt()
+                        }
+
+                        val autoServingDesc = PortionCalculator.formatPortionDescription(
+                            targetGrams = eatenGrams,
+                            baseGrams = baseGrams,
+                            multiplier = customMultiplier,
+                            baseServingUnit = customServingUnit
+                        )
+                        val effectiveServing = if (isManualServingLabel && customServingLabelOverride.isNotBlank()) {
+                            customServingLabelOverride
+                        } else {
+                            autoServingDesc
+                        }
+
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .weight(1f)
+                                .verticalScroll(rememberScrollState())
                         ) {
                             OutlinedTextField(
                                 value = customName,
                                 onValueChange = { customName = it },
                                 label = { Text("Food / Beverage Name") },
                                 placeholder = { Text("e.g. Homemade Roast Chicken, Oats & Honey") },
+                                singleLine = true,
                                 modifier = Modifier.fillMaxWidth(),
                                 colors = OutlinedTextFieldDefaults.colors(
                                     focusedBorderColor = AppTheme.colors.primary,
@@ -1956,51 +1992,14 @@ fun UkFoodSearchDialog(
                                 )
                             )
 
-                            Spacer(modifier = Modifier.height(8.dp))
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                OutlinedTextField(
-                                    value = customCalories,
-                                    onValueChange = { if (it.all { c -> c.isDigit() }) customCalories = it },
-                                    label = { Text("Calories (kcal)") },
-                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                    modifier = Modifier.weight(1f),
-                                    colors = OutlinedTextFieldDefaults.colors(
-                                        focusedBorderColor = AppTheme.colors.primary,
-                                        unfocusedBorderColor = AppTheme.colors.border,
-                                        focusedContainerColor = AppTheme.colors.inputBackground,
-                                        unfocusedContainerColor = AppTheme.colors.inputBackground,
-                                        focusedTextColor = AppTheme.colors.textPrimary,
-                                        unfocusedTextColor = AppTheme.colors.textPrimary
-                                    )
-                                )
-
-                                OutlinedTextField(
-                                    value = customServing,
-                                    onValueChange = { customServing = it },
-                                    label = { Text("Portion / Serving") },
-                                    modifier = Modifier.weight(1f),
-                                    colors = OutlinedTextFieldDefaults.colors(
-                                        focusedBorderColor = AppTheme.colors.primary,
-                                        unfocusedBorderColor = AppTheme.colors.border,
-                                        focusedContainerColor = AppTheme.colors.inputBackground,
-                                        unfocusedContainerColor = AppTheme.colors.inputBackground,
-                                        focusedTextColor = AppTheme.colors.textPrimary,
-                                        unfocusedTextColor = AppTheme.colors.textPrimary
-                                    )
-                                )
-                            }
-
-                            Spacer(modifier = Modifier.height(8.dp))
+                            Spacer(modifier = Modifier.height(6.dp))
 
                             OutlinedTextField(
                                 value = customBrand,
                                 onValueChange = { customBrand = it },
-                                label = { Text("Brand or Tag (Optional)") },
-                                placeholder = { Text("e.g. Homemade, Local Cafe, Custom") },
+                                label = { Text("Brand / Tag (Optional)") },
+                                placeholder = { Text("e.g. Homemade, Meal Prep, Local Cafe") },
+                                singleLine = true,
                                 modifier = Modifier.fillMaxWidth(),
                                 colors = OutlinedTextFieldDefaults.colors(
                                     focusedBorderColor = AppTheme.colors.primary,
@@ -2014,6 +2013,404 @@ fun UkFoodSearchDialog(
 
                             Spacer(modifier = Modifier.height(10.dp))
 
+                            // 1. Reference Serving & Calories Card
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = AppTheme.colors.surfaceElevated,
+                                border = BorderStroke(1.dp, AppTheme.colors.border),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(modifier = Modifier.padding(10.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            "1. BASELINE / PACKET REFERENCE",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = AppTheme.colors.primary,
+                                            letterSpacing = 0.8.sp
+                                        )
+                                        // Unit selector chips
+                                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                            listOf("g" to "g", "ml" to "ml", "portion" to "serv").forEach { (u, label) ->
+                                                val isSelected = customServingUnit == u
+                                                Surface(
+                                                    shape = RoundedCornerShape(6.dp),
+                                                    color = if (isSelected) AppTheme.colors.primary else AppTheme.colors.surface,
+                                                    border = BorderStroke(1.dp, if (isSelected) AppTheme.colors.primary else AppTheme.colors.border),
+                                                    modifier = Modifier.clickable { customServingUnit = u }
+                                                ) {
+                                                    Text(
+                                                        text = label,
+                                                        fontSize = 10.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = if (isSelected) Color.White else AppTheme.colors.textSecondary,
+                                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.height(6.dp))
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        OutlinedTextField(
+                                            value = customBaseGramsText,
+                                            onValueChange = {
+                                                if (it.all { c -> c.isDigit() || c == '.' }) {
+                                                    customBaseGramsText = it
+                                                    // Also keep eaten grams in sync if multiplier is 1x
+                                                    if (customMultiplier == 1.0f) {
+                                                        customEatenGramsText = it
+                                                    } else {
+                                                        val bg = it.toFloatOrNull() ?: 100f
+                                                        customEatenGramsText = ((bg * customMultiplier * 10).toInt() / 10f).toString().removeSuffix(".0")
+                                                    }
+                                                }
+                                            },
+                                            label = { Text("Base Size ($customServingUnit)") },
+                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                            singleLine = true,
+                                            modifier = Modifier.weight(1f),
+                                            colors = OutlinedTextFieldDefaults.colors(
+                                                focusedBorderColor = AppTheme.colors.primary,
+                                                unfocusedBorderColor = AppTheme.colors.border,
+                                                focusedContainerColor = AppTheme.colors.inputBackground,
+                                                unfocusedContainerColor = AppTheme.colors.inputBackground,
+                                                focusedTextColor = AppTheme.colors.textPrimary,
+                                                unfocusedTextColor = AppTheme.colors.textPrimary
+                                            )
+                                        )
+
+                                        OutlinedTextField(
+                                            value = customBaseCaloriesText,
+                                            onValueChange = { if (it.all { c -> c.isDigit() }) customBaseCaloriesText = it },
+                                            label = { Text("Base Calories (kcal)") },
+                                            placeholder = { Text("e.g. 250") },
+                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                            singleLine = true,
+                                            modifier = Modifier.weight(1f),
+                                            colors = OutlinedTextFieldDefaults.colors(
+                                                focusedBorderColor = AppTheme.colors.primary,
+                                                unfocusedBorderColor = AppTheme.colors.border,
+                                                focusedContainerColor = AppTheme.colors.inputBackground,
+                                                unfocusedContainerColor = AppTheme.colors.inputBackground,
+                                                focusedTextColor = AppTheme.colors.textPrimary,
+                                                unfocusedTextColor = AppTheme.colors.textPrimary
+                                            )
+                                        )
+                                    }
+
+                                    Spacer(modifier = Modifier.height(6.dp))
+
+                                    // Quick baseline presets
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        listOf(100f to "100$customServingUnit", 50f to "50$customServingUnit", 30f to "30$customServingUnit", 1f to "1 serv").forEach { (presetGrams, label) ->
+                                            val isSelected = baseGrams == presetGrams
+                                            Surface(
+                                                shape = RoundedCornerShape(6.dp),
+                                                color = if (isSelected) AppTheme.colors.primary.copy(alpha = 0.15f) else AppTheme.colors.surface,
+                                                border = BorderStroke(1.dp, if (isSelected) AppTheme.colors.primary else AppTheme.colors.border),
+                                                modifier = Modifier
+                                                    .weight(1f)
+                                                    .clickable {
+                                                        val strVal = if (presetGrams % 1f == 0f) presetGrams.toInt().toString() else presetGrams.toString()
+                                                        customBaseGramsText = strVal
+                                                        customEatenGramsText = ((presetGrams * customMultiplier * 10).toInt() / 10f).toString().removeSuffix(".0")
+                                                    }
+                                            ) {
+                                                Text(
+                                                    text = label,
+                                                    fontSize = 10.sp,
+                                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                                    color = if (isSelected) AppTheme.colors.primary else AppTheme.colors.textSecondary,
+                                                    textAlign = TextAlign.Center,
+                                                    modifier = Modifier.padding(vertical = 4.dp)
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            // 2. Portion Size & Auto-Calculation Card
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = AppTheme.colors.surfaceElevated,
+                                border = BorderStroke(1.5.dp, AppTheme.colors.primary.copy(alpha = 0.7f)),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(modifier = Modifier.padding(10.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            "2. EATEN AMOUNT & AUTO-CALCULATOR",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = AppTheme.colors.primary,
+                                            letterSpacing = 0.8.sp
+                                        )
+                                        Surface(
+                                            color = AppTheme.colors.success.copy(alpha = 0.15f),
+                                            shape = RoundedCornerShape(4.dp)
+                                        ) {
+                                            Text(
+                                                text = "Auto-Scaling Active",
+                                                color = AppTheme.colors.success,
+                                                fontSize = 9.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                                            )
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.height(6.dp))
+
+                                    // Gram input with stepper buttons
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        // Minus 50g
+                                        Surface(
+                                            shape = RoundedCornerShape(8.dp),
+                                            color = AppTheme.colors.surface,
+                                            border = BorderStroke(1.dp, AppTheme.colors.border),
+                                            modifier = Modifier.clickable {
+                                                val next = (eatenGrams - 50f).coerceAtLeast(5f)
+                                                customEatenGramsText = if (next % 1f == 0f) next.toInt().toString() else next.toString()
+                                                if (baseGrams > 0f) customMultiplier = (next / baseGrams)
+                                            }
+                                        ) {
+                                            Text("-50", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = AppTheme.colors.textSecondary, modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp))
+                                        }
+
+                                        // Minus 10g
+                                        Surface(
+                                            shape = RoundedCornerShape(8.dp),
+                                            color = AppTheme.colors.surface,
+                                            border = BorderStroke(1.dp, AppTheme.colors.border),
+                                            modifier = Modifier.clickable {
+                                                val next = (eatenGrams - 10f).coerceAtLeast(1f)
+                                                customEatenGramsText = if (next % 1f == 0f) next.toInt().toString() else next.toString()
+                                                if (baseGrams > 0f) customMultiplier = (next / baseGrams)
+                                            }
+                                        ) {
+                                            Text("-10", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = AppTheme.colors.textSecondary, modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp))
+                                        }
+
+                                        OutlinedTextField(
+                                            value = customEatenGramsText,
+                                            onValueChange = {
+                                                if (it.all { c -> c.isDigit() || c == '.' }) {
+                                                    customEatenGramsText = it
+                                                    val eg = it.toFloatOrNull() ?: 0f
+                                                    if (baseGrams > 0f && eg > 0f) {
+                                                        customMultiplier = eg / baseGrams
+                                                    }
+                                                }
+                                            },
+                                            label = { Text("Eaten ($customServingUnit)") },
+                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                            singleLine = true,
+                                            modifier = Modifier.weight(1f),
+                                            colors = OutlinedTextFieldDefaults.colors(
+                                                focusedBorderColor = AppTheme.colors.primary,
+                                                unfocusedBorderColor = AppTheme.colors.border,
+                                                focusedContainerColor = AppTheme.colors.inputBackground,
+                                                unfocusedContainerColor = AppTheme.colors.inputBackground,
+                                                focusedTextColor = AppTheme.colors.textPrimary,
+                                                unfocusedTextColor = AppTheme.colors.textPrimary
+                                            )
+                                        )
+
+                                        // Plus 10g
+                                        Surface(
+                                            shape = RoundedCornerShape(8.dp),
+                                            color = AppTheme.colors.surface,
+                                            border = BorderStroke(1.dp, AppTheme.colors.border),
+                                            modifier = Modifier.clickable {
+                                                val next = eatenGrams + 10f
+                                                customEatenGramsText = if (next % 1f == 0f) next.toInt().toString() else next.toString()
+                                                if (baseGrams > 0f) customMultiplier = (next / baseGrams)
+                                            }
+                                        ) {
+                                            Text("+10", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = AppTheme.colors.textSecondary, modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp))
+                                        }
+
+                                        // Plus 50g
+                                        Surface(
+                                            shape = RoundedCornerShape(8.dp),
+                                            color = AppTheme.colors.surface,
+                                            border = BorderStroke(1.dp, AppTheme.colors.border),
+                                            modifier = Modifier.clickable {
+                                                val next = eatenGrams + 50f
+                                                customEatenGramsText = if (next % 1f == 0f) next.toInt().toString() else next.toString()
+                                                if (baseGrams > 0f) customMultiplier = (next / baseGrams)
+                                            }
+                                        ) {
+                                            Text("+50", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = AppTheme.colors.textSecondary, modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp))
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.height(6.dp))
+
+                                    // Multiplier quick chips
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        listOf(0.5f to "½ Half", 1.0f to "1x Single", 1.5f to "1.5x", 2.0f to "2x Double", 3.0f to "3x").forEach { (mult, label) ->
+                                            val isSelected = (Math.abs(customMultiplier - mult) < 0.05f) || (baseGrams > 0f && Math.abs(eatenGrams - (baseGrams * mult)) < 0.5f)
+                                            Surface(
+                                                shape = RoundedCornerShape(6.dp),
+                                                color = if (isSelected) AppTheme.colors.primary else AppTheme.colors.surface,
+                                                border = BorderStroke(1.dp, if (isSelected) AppTheme.colors.primary else AppTheme.colors.border),
+                                                modifier = Modifier
+                                                    .weight(1f)
+                                                    .clickable {
+                                                        customMultiplier = mult
+                                                        val targetG = baseGrams * mult
+                                                        customEatenGramsText = if (targetG % 1f == 0f) targetG.toInt().toString() else ((targetG * 10).toInt() / 10f).toString().removeSuffix(".0")
+                                                    }
+                                            ) {
+                                                Text(
+                                                    text = label,
+                                                    fontSize = 10.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = if (isSelected) Color.White else AppTheme.colors.textPrimary,
+                                                    textAlign = TextAlign.Center,
+                                                    modifier = Modifier.padding(vertical = 5.dp)
+                                                )
+                                            }
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.height(8.dp))
+
+                                    // Live calculation banner
+                                    Surface(
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = AppTheme.colors.surface,
+                                        border = BorderStroke(1.dp, AppTheme.colors.primary.copy(alpha = 0.3f)),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(horizontal = 10.dp, vertical = 8.dp),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Column {
+                                                Text(
+                                                    text = "CALCULATED TOTAL",
+                                                    fontSize = 10.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = AppTheme.colors.textMuted,
+                                                    letterSpacing = 0.5.sp
+                                                )
+                                                Text(
+                                                    text = if (baseCalories > 0f) {
+                                                        "${baseCalories.toInt()} kcal per ${baseGrams.toInt()}$customServingUnit × ${eatenGrams.toInt()}$customServingUnit"
+                                                    } else {
+                                                        "Enter base calories above to calculate"
+                                                    },
+                                                    fontSize = 11.sp,
+                                                    color = AppTheme.colors.textSecondary
+                                                )
+                                            }
+                                            Text(
+                                                text = "$autoCalculatedCalories kcal",
+                                                color = AppTheme.colors.success,
+                                                fontSize = 20.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            // 3. Portion label & Custom Description
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = AppTheme.colors.surfaceElevated,
+                                border = BorderStroke(1.dp, AppTheme.colors.border),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = "Logged Portion Label:",
+                                            fontSize = 11.sp,
+                                            color = AppTheme.colors.textMuted,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                        Text(
+                                            text = if (isManualServingLabel) "Manual Edit" else "Auto-generated",
+                                            fontSize = 10.sp,
+                                            color = AppTheme.colors.primary,
+                                            fontWeight = FontWeight.Bold,
+                                            modifier = Modifier.clickable {
+                                                isManualServingLabel = !isManualServingLabel
+                                                if (isManualServingLabel && customServingLabelOverride.isBlank()) {
+                                                    customServingLabelOverride = autoServingDesc
+                                                }
+                                            }
+                                        )
+                                    }
+                                    if (isManualServingLabel) {
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        OutlinedTextField(
+                                            value = customServingLabelOverride,
+                                            onValueChange = { customServingLabelOverride = it },
+                                            singleLine = true,
+                                            modifier = Modifier.fillMaxWidth(),
+                                            colors = OutlinedTextFieldDefaults.colors(
+                                                focusedBorderColor = AppTheme.colors.primary,
+                                                unfocusedBorderColor = AppTheme.colors.border,
+                                                focusedContainerColor = AppTheme.colors.inputBackground,
+                                                unfocusedContainerColor = AppTheme.colors.inputBackground,
+                                                focusedTextColor = AppTheme.colors.textPrimary,
+                                                unfocusedTextColor = AppTheme.colors.textPrimary
+                                            )
+                                        )
+                                    } else {
+                                        Text(
+                                            text = effectiveServing,
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = AppTheme.colors.textPrimary,
+                                            modifier = Modifier.padding(top = 2.dp)
+                                        )
+                                    }
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
                             // Save for future use toggle
                             Surface(
                                 shape = RoundedCornerShape(10.dp),
@@ -2024,7 +2421,7 @@ fun UkFoodSearchDialog(
                                     .clickable { saveCustomForFuture = !saveCustomForFuture }
                             ) {
                                 Row(
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Checkbox(
@@ -2042,18 +2439,18 @@ fun UkFoodSearchDialog(
                                                 Icons.Default.Star,
                                                 contentDescription = null,
                                                 tint = if (saveCustomForFuture) Color(0xFFFFB300) else AppTheme.colors.textMuted,
-                                                modifier = Modifier.size(15.dp)
+                                                modifier = Modifier.size(14.dp)
                                             )
                                             Spacer(modifier = Modifier.width(4.dp))
                                             Text(
-                                                "Save to My Saved Foods for future use",
+                                                "Save baseline to My Saved Foods",
                                                 fontWeight = FontWeight.Bold,
                                                 fontSize = 12.sp,
                                                 color = AppTheme.colors.textPrimary
                                             )
                                         }
                                         Text(
-                                            "Easily select this saved product in the 'Saved' tab anytime",
+                                            "Easily re-scale and log this item anytime from the Saved tab",
                                             fontSize = 10.sp,
                                             color = AppTheme.colors.textSecondary
                                         )
@@ -2061,7 +2458,7 @@ fun UkFoodSearchDialog(
                                 }
                             }
 
-                            Spacer(modifier = Modifier.weight(1f))
+                            Spacer(modifier = Modifier.height(10.dp))
 
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
@@ -2069,19 +2466,20 @@ fun UkFoodSearchDialog(
                             ) {
                                 OutlinedButton(
                                     onClick = {
-                                        val cal = customCalories.toIntOrNull() ?: 0
+                                        val cal = if (baseCalories > 0f) baseCalories.toInt() else autoCalculatedCalories
+                                        val baseServ = "${baseGrams.toInt()}$customServingUnit"
                                         viewModel.saveFoodItemDirectly(
                                             name = customName,
-                                            servingSize = customServing,
+                                            servingSize = baseServ,
                                             calories = cal,
                                             defaultMealType = selectedMeal,
                                             barcode = null,
                                             brandOrSupermarket = customBrand.ifBlank { "Custom Food" }
                                         )
-                                        Toast.makeText(context, "Saved '$customName' to My Saved Foods ⭐", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(context, "Saved '$customName' ($baseServ = $cal kcal) ⭐", Toast.LENGTH_SHORT).show()
                                         activeTab = 1 // Switch to Saved tab
                                     },
-                                    enabled = customName.isNotBlank() && customCalories.isNotBlank(),
+                                    enabled = customName.isNotBlank() && (customBaseCaloriesText.isNotBlank() || autoCalculatedCalories > 0),
                                     shape = RoundedCornerShape(10.dp),
                                     modifier = Modifier
                                         .weight(0.9f)
@@ -2089,30 +2487,29 @@ fun UkFoodSearchDialog(
                                 ) {
                                     Icon(Icons.Default.Star, contentDescription = null, tint = Color(0xFFFFB300), modifier = Modifier.size(15.dp))
                                     Spacer(modifier = Modifier.width(4.dp))
-                                    Text("Save Only", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                    Text("Save Baseline", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                 }
 
                                 Button(
                                     onClick = {
-                                        val cal = customCalories.toIntOrNull() ?: 0
                                         onSave(
                                             customName,
-                                            customServing,
-                                            cal,
+                                            effectiveServing,
+                                            autoCalculatedCalories,
                                             selectedMeal,
                                             null,
                                             customBrand.ifBlank { "Custom Food" },
                                             saveCustomForFuture
                                         )
                                     },
-                                    enabled = customName.isNotBlank() && customCalories.isNotBlank(),
+                                    enabled = customName.isNotBlank() && (customBaseCaloriesText.isNotBlank() || autoCalculatedCalories > 0),
                                     modifier = Modifier
                                         .weight(1.1f)
                                         .height(46.dp),
                                     shape = RoundedCornerShape(10.dp),
                                     colors = ButtonDefaults.buttonColors(containerColor = AppTheme.colors.primary)
                                 ) {
-                                    Text("Log to $selectedMeal", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color.White)
+                                    Text("Log $autoCalculatedCalories kcal to $selectedMeal", fontWeight = FontWeight.Bold, fontSize = 11.sp, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                 }
                             }
                         }
@@ -2323,8 +2720,13 @@ fun LogScannedProductDialog(
     var editableName by remember { mutableStateOf(product.name) }
     var editableServing by remember { mutableStateOf(product.servingSize) }
     var editableCalories by remember { mutableStateOf(product.caloriesPerServing.toString()) }
+    var scannedMultiplier by remember { mutableStateOf(1.0f) }
     var selectedMeal by remember { mutableStateOf(initialMealType) }
     var saveForFuture by remember { mutableStateOf(true) }
+
+    val parsedBaseCal = editableCalories.toIntOrNull() ?: product.caloriesPerServing
+    val scaledCalories = (parsedBaseCal * scannedMultiplier).toInt()
+    val finalServing = if (scannedMultiplier == 1.0f) editableServing else "${if (scannedMultiplier % 1f == 0f) scannedMultiplier.toInt().toString() else scannedMultiplier.toString()}x $editableServing"
 
     val brandColor = getSupermarketBrandColor(product.brandOrSupermarket)
     val isFound = product.name.isNotBlank()
@@ -2466,7 +2868,7 @@ fun LogScannedProductDialog(
                     OutlinedTextField(
                         value = editableCalories,
                         onValueChange = { if (it.all { c -> c.isDigit() }) editableCalories = it },
-                        label = { Text("Calories (kcal)") },
+                        label = { Text("Base Calories (kcal)") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.weight(1f),
                         colors = OutlinedTextFieldDefaults.colors(
@@ -2482,7 +2884,7 @@ fun LogScannedProductDialog(
                     OutlinedTextField(
                         value = editableServing,
                         onValueChange = { editableServing = it },
-                        label = { Text("Portion") },
+                        label = { Text("Base Portion") },
                         modifier = Modifier.weight(1f),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = AppTheme.colors.primary,
@@ -2493,6 +2895,76 @@ fun LogScannedProductDialog(
                             unfocusedTextColor = AppTheme.colors.textPrimary
                         )
                     )
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Portion Multiplier & Auto-Scale
+                Text("Serving Scale / Multiplier:", color = AppTheme.colors.textMuted, fontSize = 12.sp)
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    listOf(0.5f to "½ Half", 1.0f to "1x Single", 1.5f to "1.5x", 2.0f to "2x Double", 3.0f to "3x").forEach { (mult, label) ->
+                        val isSelected = Math.abs(scannedMultiplier - mult) < 0.05f
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (isSelected) AppTheme.colors.primary else AppTheme.colors.surfaceElevated,
+                            border = BorderStroke(1.dp, if (isSelected) AppTheme.colors.primary else AppTheme.colors.border),
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable { scannedMultiplier = mult }
+                        ) {
+                            Text(
+                                text = label,
+                                color = if (isSelected) Color.White else AppTheme.colors.textPrimary,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.padding(vertical = 6.dp)
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Dynamic Total Banner
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = AppTheme.colors.surfaceElevated,
+                    border = BorderStroke(1.dp, AppTheme.colors.primary.copy(alpha = 0.3f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text(
+                                text = "CALCULATED LOG",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = AppTheme.colors.textMuted
+                            )
+                            Text(
+                                text = finalServing,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = AppTheme.colors.textPrimary
+                            )
+                        }
+                        Text(
+                            text = "$scaledCalories kcal",
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = AppTheme.colors.success
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(12.dp))
@@ -2548,11 +3020,10 @@ fun LogScannedProductDialog(
 
                 Button(
                     onClick = {
-                        val baseCal = editableCalories.toIntOrNull() ?: 0
                         onConfirm(
                             editableName,
-                            editableServing,
-                            baseCal,
+                            finalServing,
+                            scaledCalories,
                             selectedMeal,
                             product.barcode,
                             product.brandOrSupermarket,
@@ -2568,7 +3039,7 @@ fun LogScannedProductDialog(
                 ) {
                     Icon(Icons.Default.Check, contentDescription = null, tint = Color.White)
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("Confirm & Log Scanned Food", color = Color.White, fontWeight = FontWeight.Bold)
+                    Text("Confirm & Log $scaledCalories kcal", color = Color.White, fontWeight = FontWeight.Bold)
                 }
             }
         }

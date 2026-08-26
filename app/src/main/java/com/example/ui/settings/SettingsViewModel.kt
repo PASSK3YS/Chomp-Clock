@@ -271,13 +271,28 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun getBuiltInReleaseNotes(): List<ReleaseNoteItem> {
-        val currentVersion = BuildConfig.VERSION_NAME.ifEmpty { "1.2.5" }
+        val currentVersion = BuildConfig.VERSION_NAME.ifEmpty { "1.2.6" }
         return listOf(
             ReleaseNoteItem(
-                version = "v1.2.5",
+                version = "v1.2.6",
                 date = "Latest Verified Build (August 2026)",
-                title = "Expanded Achievements System & Interactive Daily Streak Popup",
+                title = "Smart Dynamic Custom Food Portion & Gram Calorie Auto-Calculation",
                 isLatestVerified = true,
+                highlights = listOf(
+                    "Dynamic calorie auto-calculation when entering custom foods based on reference serving and grams",
+                    "Real-time calorie scaling when doubling servings (2x), halving (0.5x), or adjusting grams up/down",
+                    "Quick portion multiplier chips (½, 1x, 1.5x, 2x Double, 3x Triple) and instant gram step buttons (±10g, ±50g)",
+                    "Live energy breakdown formula display showing exact kcal/g energy density and portion math",
+                    "Proportional gram scaling support across Custom Food, Scanned Products, and Saved Foods",
+                    "Auto-generated or custom portion labels with clean log-to-meal workflow"
+                ),
+                fullBody = "Version 1.2.6 adds an intelligent automatic calorie calculator for custom food input, dynamically updating total calories in real-time as users double servings, adjust gram weights, or select quick portion multipliers."
+            ),
+            ReleaseNoteItem(
+                version = "v1.2.5",
+                date = "August 2026",
+                title = "Expanded Achievements System & Interactive Daily Streak Popup",
+                isLatestVerified = false,
                 highlights = listOf(
                     "Comprehensive multi-category achievements (Sessions, Duration, Streaks, Nutrition, and Body Metrics)",
                     "Interactive Daily Streak dialog popup when tapping the fire badge on the Fasting screen",
