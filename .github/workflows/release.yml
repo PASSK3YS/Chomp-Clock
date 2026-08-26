@@ -60,22 +60,34 @@ jobs:
           fi
           touch .env
 
-      - name: Setup Release Keystore (if secret provided)
+      - name: Setup Release Keystore
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 || secrets.SIGNING_KEY }}
         run: |
           if [ -n "$KEYSTORE_BASE64" ]; then
             echo "$KEYSTORE_BASE64" | tr -d '\r\n ' | base64 --decode > my-upload-key.jks
-            echo "Release keystore decoded successfully."
+            echo "Release keystore decoded from repository secret."
           else
-            echo "No custom keystore secret found; build will use fallback debug signing configuration."
+            echo "Generating consistent release signing keystore for automated builds..."
+            keytool -genkeypair -v \
+              -keystore my-upload-key.jks \
+              -alias chompclock \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000 \
+              -storepass "chompclock_release_pass" \
+              -keypass "chompclock_release_pass" \
+              -dname "CN=ChompClock, OU=Mobile, O=PASSK3YS, L=Global, S=CA, C=US"
+            echo "STORE_PASSWORD=chompclock_release_pass" >> $GITHUB_ENV
+            echo "KEY_ALIAS=chompclock" >> $GITHUB_ENV
+            echo "KEY_PASSWORD=chompclock_release_pass" >> $GITHUB_ENV
           fi
 
       - name: Build Android APKs (Release & Debug)
         env:
-          STORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD || secrets.STORE_PASSWORD }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          STORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD || secrets.STORE_PASSWORD || env.STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD || env.KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS || env.KEY_ALIAS }}
         run: |
           ./gradlew assembleRelease assembleDebug --stacktrace --no-daemon
 

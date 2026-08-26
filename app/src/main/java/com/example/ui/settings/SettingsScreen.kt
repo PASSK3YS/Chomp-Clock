@@ -1827,6 +1827,14 @@ fun SettingsScreen(
                                             Text("Release Notes", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                         }
                                     }
+
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text(
+                                        text = "Note: If Android shows 'App not updated' during manual APK install, please uninstall the older build once (export backup above first).",
+                                        color = AppTheme.colors.textMuted,
+                                        fontSize = 10.sp,
+                                        lineHeight = 13.sp
+                                    )
                                 }
                             }
                         }
