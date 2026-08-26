@@ -9,9 +9,9 @@ on:
   workflow_dispatch:
     inputs:
       tag_name:
-        description: 'Release Tag / Version Name (e.g. v1.2.3)'
+        description: 'Release Tag / Version Name (e.g. v1.2.4)'
         required: false
-        default: 'v1.2.3'
+        default: 'v1.2.4'
       draft:
         description: 'Create draft release'
         required: false
@@ -104,7 +104,7 @@ jobs:
           elif [ -n "${{ inputs.tag_name }}" ]; then
             TAG="${{ inputs.tag_name }}"
           else
-            TAG="v1.2.3"
+            TAG="v1.2.4"
           fi
           echo "TARGET_TAG=$TAG" >> $GITHUB_ENV
           echo "Target tag is: $TAG"

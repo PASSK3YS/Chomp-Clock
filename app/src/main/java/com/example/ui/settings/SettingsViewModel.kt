@@ -159,7 +159,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 statusMessage = "Connecting to GitHub...",
                 step = 1
             )
-            val currentVersion = BuildConfig.VERSION_NAME.ifEmpty { "1.2.3" }
+            val currentVersion = BuildConfig.VERSION_NAME.ifEmpty { "1.2.4" }
             val currentClean = currentVersion.removePrefix("v").trim()
             val defaultRepoUrl = "https://github.com/PASSK3YS/Chomp-Clock/releases"
 
@@ -271,13 +271,26 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun getBuiltInReleaseNotes(): List<ReleaseNoteItem> {
-        val currentVersion = BuildConfig.VERSION_NAME.ifEmpty { "1.2.3" }
+        val currentVersion = BuildConfig.VERSION_NAME.ifEmpty { "1.2.4" }
         return listOf(
             ReleaseNoteItem(
-                version = "v1.2.3",
+                version = "v1.2.4",
                 date = "Latest Verified Build (August 2026)",
-                title = "Enhanced Update Checking & Live Repository Verification",
+                title = "Custom Adaptive Launcher Icon & Release Keystore Alignment",
                 isLatestVerified = true,
+                highlights = listOf(
+                    "Custom Material You adaptive launcher icon featuring modern fasting stopwatch dial with emerald/amber gradient progress arc and bite detailing",
+                    "Automated release signing keystore configuration for seamless in-place APK updates from GitHub Releases",
+                    "Resolved APK signature mismatch installation issues across releases",
+                    "Performance optimizations and updated release distribution workflows"
+                ),
+                fullBody = "Version 1.2.4 introduces a custom adaptive app launcher icon, replaces default placeholder assets, and standardizes release keystore configurations to ensure smooth in-place APK updates from GitHub Releases."
+            ),
+            ReleaseNoteItem(
+                version = "v1.2.3",
+                date = "August 2026",
+                title = "Enhanced Update Checking & Live Repository Verification",
+                isLatestVerified = false,
                 highlights = listOf(
                     "Real-time visual feedback with animated checking states and multi-step progress indicator",
                     "Dual-channel repository check querying both GitHub Releases and Git Tags on PASSK3YS/Chomp-Clock",
