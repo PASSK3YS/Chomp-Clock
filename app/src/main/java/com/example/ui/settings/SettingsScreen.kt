@@ -374,73 +374,120 @@ fun SettingsScreen(
             border = BorderStroke(1.dp, AppTheme.colors.border)
         ) {
             Column(modifier = Modifier.padding(18.dp)) {
-                Text(
-                    text = "PROFILE & AVATAR",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = AppTheme.colors.textMuted,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 1.sp
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "PROFILE & AVATAR",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = AppTheme.colors.textMuted,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.sp
+                    )
+                    Surface(
+                        shape = RoundedCornerShape(50),
+                        color = AppTheme.colors.primary.copy(alpha = 0.12f),
+                        border = BorderStroke(1.dp, AppTheme.colors.primary.copy(alpha = 0.3f)),
+                        modifier = Modifier.clickable { showAvatarPicker = true }
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Edit,
+                                contentDescription = null,
+                                tint = AppTheme.colors.primary,
+                                modifier = Modifier.size(12.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "Change Avatar",
+                                color = AppTheme.colors.primary,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
+                }
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
+                // Avatar header with user summary
+                Surface(
+                    shape = RoundedCornerShape(14.dp),
+                    color = AppTheme.colors.surfaceElevated,
+                    border = BorderStroke(1.dp, AppTheme.colors.border),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Box {
-                        UserAvatarView(
-                            avatarId = p.avatarId,
-                            size = 64.dp,
-                            onClick = { showAvatarPicker = true }
-                        )
-                        Surface(
-                            onClick = { showAvatarPicker = true },
-                            shape = CircleShape,
-                            color = AppTheme.colors.primary,
-                            border = BorderStroke(2.dp, AppTheme.colors.surface),
-                            modifier = Modifier
-                                .size(24.dp)
-                                .align(Alignment.BottomEnd)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = Icons.Default.Edit,
-                                    contentDescription = "Edit Avatar",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(12.dp)
-                                )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(14.dp)
+                    ) {
+                        Box {
+                            UserAvatarView(
+                                avatarId = p.avatarId,
+                                size = 60.dp,
+                                onClick = { showAvatarPicker = true }
+                            )
+                            Surface(
+                                onClick = { showAvatarPicker = true },
+                                shape = CircleShape,
+                                color = AppTheme.colors.primary,
+                                border = BorderStroke(2.dp, AppTheme.colors.surfaceElevated),
+                                modifier = Modifier
+                                    .size(22.dp)
+                                    .align(Alignment.BottomEnd)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        imageVector = Icons.Default.Edit,
+                                        contentDescription = "Edit Avatar",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(11.dp)
+                                    )
+                                }
                             }
                         }
-                    }
 
-                    Spacer(modifier = Modifier.width(16.dp))
+                        Spacer(modifier = Modifier.width(14.dp))
 
-                    Column {
-                        Text(
-                            text = p.username.ifEmpty { "User" },
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = AppTheme.colors.textPrimary
-                        )
-                        val formattedH = WeightUtils.formatHeight(p.heightCm, p.heightUnit)
-                        Text(
-                            text = "${p.gender} • $formattedH${if (p.waistCm != null && p.waistCm > 0f) " • Waist: ${WeightUtils.formatWaist(p.waistCm, p.heightUnit == HeightUnit.FT_IN)}" else ""}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = AppTheme.colors.textSecondary
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = "Tap avatar to change icon or photo",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = AppTheme.colors.primaryVariant,
-                            modifier = Modifier.clickable { showAvatarPicker = true }
-                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = p.username.ifEmpty { "User" },
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = AppTheme.colors.textPrimary
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            val formattedH = WeightUtils.formatHeight(p.heightCm, p.heightUnit)
+                            val waistSummary = if (p.waistCm != null && p.waistCm > 0f) {
+                                " • Waist: ${WeightUtils.formatWaist(p.waistCm, p.heightUnit == HeightUnit.FT_IN)}"
+                            } else ""
+                            Text(
+                                text = "${p.gender} • $formattedH$waistSummary",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = AppTheme.colors.textSecondary
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "Tap photo or icon to choose a new avatar",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = AppTheme.colors.primary,
+                                fontSize = 11.sp,
+                                modifier = Modifier.clickable { showAvatarPicker = true }
+                            )
+                        }
                     }
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
+                // Display Name input
                 OutlinedTextField(
                     value = editName,
                     onValueChange = {
@@ -448,6 +495,14 @@ fun SettingsScreen(
                         viewModel.updateUsername(it)
                     },
                     label = { Text("Display Name") },
+                    leadingIcon = {
+                        Icon(
+                            Icons.Default.Person,
+                            contentDescription = null,
+                            tint = AppTheme.colors.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     colors = OutlinedTextFieldDefaults.colors(
@@ -460,7 +515,7 @@ fun SettingsScreen(
                     )
                 )
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(14.dp))
 
                 // Height Section with Unit Switcher (cm vs ft/in)
                 Row(
@@ -468,18 +523,26 @@ fun SettingsScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = "Height",
-                        color = AppTheme.colors.textSecondary,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Medium
-                    )
+                    Column {
+                        Text(
+                            text = "Height",
+                            color = AppTheme.colors.textPrimary,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = "Used for BMI & caloric calculations",
+                            color = AppTheme.colors.textMuted,
+                            fontSize = 11.sp
+                        )
+                    }
 
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(4.dp),
                         modifier = Modifier
                             .background(AppTheme.colors.surfaceElevated, RoundedCornerShape(8.dp))
-                            .padding(2.dp)
+                            .border(1.dp, AppTheme.colors.border, RoundedCornerShape(8.dp))
+                            .padding(3.dp)
                     ) {
                         HeightUnit.values().forEach { hUnit ->
                             val isSelected = p.heightUnit == hUnit
@@ -488,20 +551,20 @@ fun SettingsScreen(
                                 color = if (isSelected) AppTheme.colors.primary else Color.Transparent,
                                 modifier = Modifier
                                     .clickable { viewModel.updateHeightUnit(hUnit) }
-                                    .padding(horizontal = 8.dp, vertical = 4.dp)
                             ) {
                                 Text(
                                     text = if (hUnit == HeightUnit.CM) "cm" else "ft & in",
                                     color = if (isSelected) Color.White else AppTheme.colors.textSecondary,
                                     fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
                                 )
                             }
                         }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
                 if (p.heightUnit == HeightUnit.CM) {
                     OutlinedTextField(
@@ -514,8 +577,9 @@ fun SettingsScreen(
                                 }
                             }
                         },
-                        label = { Text("Height in Centimeters (cm)") },
+                        label = { Text("Height (Centimeters)") },
                         placeholder = { Text("e.g. 175") },
+                        suffix = { Text("cm", color = AppTheme.colors.textMuted, fontSize = 12.sp) },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.fillMaxWidth(),
                         colors = OutlinedTextFieldDefaults.colors(
@@ -546,8 +610,9 @@ fun SettingsScreen(
                                     }
                                 }
                             },
-                            label = { Text("Feet (ft)") },
+                            label = { Text("Feet") },
                             placeholder = { Text("5") },
+                            suffix = { Text("ft", color = AppTheme.colors.textMuted, fontSize = 12.sp) },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             modifier = Modifier.weight(1f),
                             colors = OutlinedTextFieldDefaults.colors(
@@ -573,8 +638,9 @@ fun SettingsScreen(
                                     }
                                 }
                             },
-                            label = { Text("Inches (in)") },
+                            label = { Text("Inches") },
                             placeholder = { Text("10") },
+                            suffix = { Text("in", color = AppTheme.colors.textMuted, fontSize = 12.sp) },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             modifier = Modifier.weight(1f),
                             colors = OutlinedTextFieldDefaults.colors(
@@ -589,72 +655,96 @@ fun SettingsScreen(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(14.dp))
 
-                // Waist Circumference & Gender
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    OutlinedTextField(
-                        value = editWaist,
-                        onValueChange = { wInput ->
-                            if (wInput.count { it == '.' } <= 1 && wInput.all { it.isDigit() || it == '.' } && wInput.length <= 5) {
-                                editWaist = wInput
-                                val num = wInput.toFloatOrNull()
-                                if (num != null && num > 0f) {
-                                    val cm = if (p.heightUnit == HeightUnit.FT_IN) num * 2.54f else num
-                                    viewModel.updateWaist(cm)
-                                } else if (wInput.isEmpty()) {
-                                    viewModel.updateWaist(null)
-                                }
+                // Waist Circumference
+                OutlinedTextField(
+                    value = editWaist,
+                    onValueChange = { wInput ->
+                        if (wInput.count { it == '.' } <= 1 && wInput.all { it.isDigit() || it == '.' } && wInput.length <= 5) {
+                            editWaist = wInput
+                            val num = wInput.toFloatOrNull()
+                            if (num != null && num > 0f) {
+                                val cm = if (p.heightUnit == HeightUnit.FT_IN) num * 2.54f else num
+                                viewModel.updateWaist(cm)
+                            } else if (wInput.isEmpty()) {
+                                viewModel.updateWaist(null)
                             }
-                        },
-                        label = { Text(if (p.heightUnit == HeightUnit.FT_IN) "Waist (inches)" else "Waist (cm)") },
-                        placeholder = { Text("Optional") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        modifier = Modifier.weight(1f),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = AppTheme.colors.primary,
-                            unfocusedBorderColor = AppTheme.colors.border,
-                            focusedTextColor = AppTheme.colors.textPrimary,
-                            unfocusedTextColor = AppTheme.colors.textPrimary,
-                            focusedContainerColor = AppTheme.colors.inputBackground,
-                            unfocusedContainerColor = AppTheme.colors.inputBackground
-                        )
+                        }
+                    },
+                    label = { Text(if (p.heightUnit == HeightUnit.FT_IN) "Waist Circumference (inches)" else "Waist Circumference (cm)") },
+                    placeholder = { Text("Optional — for body fat / health metrics") },
+                    suffix = { Text(if (p.heightUnit == HeightUnit.FT_IN) "in" else "cm", color = AppTheme.colors.textMuted, fontSize = 12.sp) },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = AppTheme.colors.primary,
+                        unfocusedBorderColor = AppTheme.colors.border,
+                        focusedTextColor = AppTheme.colors.textPrimary,
+                        unfocusedTextColor = AppTheme.colors.textPrimary,
+                        focusedContainerColor = AppTheme.colors.inputBackground,
+                        unfocusedContainerColor = AppTheme.colors.inputBackground
                     )
+                )
 
-                    // Gender Selector
-                    Column(modifier = Modifier.weight(1f)) {
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Biological Sex / Gender Selector
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         Text(
-                            "Gender",
-                            color = AppTheme.colors.textMuted,
-                            fontSize = 11.sp,
-                            modifier = Modifier.padding(bottom = 4.dp)
+                            text = "Biological Sex / Gender",
+                            color = AppTheme.colors.textPrimary,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold
                         )
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            listOf("Male", "Female").forEach { g ->
-                                val isSelected = p.gender.equals(g, ignoreCase = true)
-                                Surface(
-                                    shape = RoundedCornerShape(8.dp),
-                                    color = if (isSelected) AppTheme.colors.primary.copy(alpha = if (AppTheme.colors.isDark) 0.25f else 0.15f) else AppTheme.colors.inputBackground,
-                                    border = BorderStroke(1.dp, if (isSelected) AppTheme.colors.primary else AppTheme.colors.border),
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .height(52.dp)
-                                        .clickable { viewModel.updateGender(g) }
+                        Text(
+                            text = "For BMR calculation",
+                            color = AppTheme.colors.textMuted,
+                            fontSize = 11.sp
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        listOf("Male", "Female").forEach { g ->
+                            val isSelected = p.gender.equals(g, ignoreCase = true)
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = if (isSelected) AppTheme.colors.primary.copy(alpha = if (AppTheme.colors.isDark) 0.22f else 0.14f) else AppTheme.colors.inputBackground,
+                                border = BorderStroke(
+                                    1.5.dp,
+                                    if (isSelected) AppTheme.colors.primary else AppTheme.colors.border
+                                ),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(46.dp)
+                                    .clickable { viewModel.updateGender(g) }
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxSize(),
+                                    horizontalArrangement = Arrangement.Center,
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Box(contentAlignment = Alignment.Center) {
-                                        Text(
-                                            text = g,
-                                            color = if (isSelected) AppTheme.colors.primary else AppTheme.colors.textPrimary,
-                                            fontSize = 13.sp,
-                                            fontWeight = FontWeight.SemiBold
-                                        )
-                                    }
+                                    Text(
+                                        text = if (g == "Male") "♂️" else "♀️",
+                                        fontSize = 14.sp
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = g,
+                                        color = if (isSelected) AppTheme.colors.primary else AppTheme.colors.textPrimary,
+                                        fontSize = 13.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                                    )
                                 }
                             }
                         }
@@ -745,7 +835,7 @@ fun SettingsScreen(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Material You Dynamic Color Toggle
+                // Material You Dynamic Color Toggle Card
                 Surface(
                     shape = RoundedCornerShape(14.dp),
                     color = AppTheme.colors.surfaceElevated,
@@ -777,7 +867,10 @@ fun SettingsScreen(
                                 }
                                 Spacer(modifier = Modifier.width(12.dp))
                                 Column {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
                                         Text(
                                             text = "Material You Dynamic Color",
                                             fontWeight = FontWeight.Bold,
@@ -785,7 +878,6 @@ fun SettingsScreen(
                                             color = AppTheme.colors.textPrimary
                                         )
                                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                                            Spacer(modifier = Modifier.width(6.dp))
                                             Surface(
                                                 shape = RoundedCornerShape(4.dp),
                                                 color = AppTheme.colors.primary.copy(alpha = 0.2f)
@@ -795,7 +887,7 @@ fun SettingsScreen(
                                                     fontSize = 10.sp,
                                                     fontWeight = FontWeight.Bold,
                                                     color = AppTheme.colors.primary,
-                                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                                                    modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
                                                 )
                                             }
                                         }
@@ -803,7 +895,7 @@ fun SettingsScreen(
                                     Spacer(modifier = Modifier.height(2.dp))
                                     Text(
                                         text = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
-                                            "Derives adaptive tones directly from your device wallpaper & palette"
+                                            "Derives adaptive tones directly from your device wallpaper & system palette"
                                         else
                                             "Applies harmonious Google Material Design 3 dynamic color tokens",
                                         fontSize = 12.sp,
@@ -811,7 +903,7 @@ fun SettingsScreen(
                                     )
                                 }
                             }
-                            Spacer(modifier = Modifier.width(8.dp))
+                            Spacer(modifier = Modifier.width(10.dp))
                             Switch(
                                 checked = p.dynamicColor,
                                 onCheckedChange = { viewModel.updateDynamicColor(it) },
@@ -824,16 +916,29 @@ fun SettingsScreen(
                             )
                         }
 
-                        // Live Palette Swatches Preview
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Text(
-                            text = "ACTIVE PALETTE PREVIEW",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontSize = 10.sp,
-                            color = AppTheme.colors.textMuted,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
+                        // Live Palette Swatches Preview (fluid columns that fill available width evenly)
+                        Spacer(modifier = Modifier.height(14.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "ACTIVE PALETTE PREVIEW",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontSize = 10.sp,
+                                color = AppTheme.colors.textMuted,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 0.5.sp
+                            )
+                            Text(
+                                text = if (p.dynamicColor) "Dynamic active" else "Default active",
+                                fontSize = 10.sp,
+                                color = AppTheme.colors.primary,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -852,14 +957,16 @@ fun SettingsScreen(
                                 ) {
                                     Box(
                                         modifier = Modifier
-                                            .size(width = 44.dp, height = 24.dp)
+                                            .fillMaxWidth()
+                                            .height(28.dp)
                                             .background(color, RoundedCornerShape(8.dp))
                                             .border(1.dp, AppTheme.colors.borderLight, RoundedCornerShape(8.dp))
                                     )
-                                    Spacer(modifier = Modifier.height(3.dp))
+                                    Spacer(modifier = Modifier.height(4.dp))
                                     Text(
                                         text = name,
                                         fontSize = 9.sp,
+                                        fontWeight = FontWeight.Medium,
                                         color = AppTheme.colors.textMuted,
                                         maxLines = 1
                                     )
@@ -1489,7 +1596,7 @@ fun SettingsScreen(
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = "Installed: v${BuildConfig.VERSION_NAME.ifEmpty { "1.1.5" }}",
+                                text = "Installed: v${BuildConfig.VERSION_NAME.ifEmpty { "1.2.2" }}",
                                 fontWeight = FontWeight.SemiBold,
                                 fontSize = 12.sp,
                                 color = AppTheme.colors.textPrimary
@@ -1660,7 +1767,7 @@ fun SettingsScreen(
                                 }
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Text(
-                                    text = "Your app is running the latest verified build (v${BuildConfig.VERSION_NAME.ifEmpty { "1.1.5" }}), checked against PASSK3YS/Chomp-Clock GitHub repository.",
+                                    text = "Your app is running the latest verified build (v${BuildConfig.VERSION_NAME.ifEmpty { "1.2.2" }}), checked against PASSK3YS/Chomp-Clock GitHub repository.",
                                     color = AppTheme.colors.textSecondary,
                                     fontSize = 11.sp
                                 )
@@ -1708,7 +1815,7 @@ fun SettingsScreen(
                                     Icon(Icons.Default.CheckCircle, contentDescription = null, tint = AppTheme.colors.success, modifier = Modifier.size(18.dp))
                                     Spacer(modifier = Modifier.width(6.dp))
                                     Text(
-                                        text = "App is Up to Date (v${BuildConfig.VERSION_NAME.ifEmpty { "1.1.5" }})",
+                                        text = "App is Up to Date (v${BuildConfig.VERSION_NAME.ifEmpty { "1.2.2" }})",
                                         color = AppTheme.colors.textPrimary,
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 13.sp

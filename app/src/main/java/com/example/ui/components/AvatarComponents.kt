@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import coil.compose.AsyncImage
+import com.example.ui.theme.AppTheme
 import java.io.File
 
 val PRESET_AVATARS = listOf(
@@ -57,9 +58,9 @@ fun UserAvatarView(
     Surface(
         modifier = clickModifier.size(size),
         shape = CircleShape,
-        color = Color(0xFF18181B),
-        border = BorderStroke(1.5.dp, Color(0xFF3B82F6).copy(alpha = 0.6f)),
-        shadowElevation = 4.dp
+        color = AppTheme.colors.surfaceElevated,
+        border = BorderStroke(1.5.dp, AppTheme.colors.primary.copy(alpha = 0.7f)),
+        shadowElevation = if (AppTheme.colors.isDark) 4.dp else 2.dp
     ) {
         Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
             if (avatarId != null && (avatarId.startsWith("uri:") || avatarId.startsWith("file:") || avatarId.startsWith("/"))) {
@@ -94,7 +95,7 @@ fun UserAvatarView(
                 Icon(
                     imageVector = Icons.Default.Person,
                     contentDescription = "Default Avatar",
-                    tint = Color(0xFF60A5FA),
+                    tint = AppTheme.colors.primary,
                     modifier = Modifier.size(size * 0.55f)
                 )
             }
@@ -133,12 +134,14 @@ fun AvatarPickerDialog(
     Dialog(onDismissRequest = onDismiss) {
         Surface(
             shape = RoundedCornerShape(24.dp),
-            color = Color(0xFF18181B),
-            border = BorderStroke(1.dp, Color(0xFF27272A)),
-            modifier = Modifier.fillMaxWidth()
+            color = AppTheme.colors.surface,
+            border = BorderStroke(1.dp, AppTheme.colors.border),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 16.dp)
         ) {
             Column(
-                modifier = Modifier.padding(24.dp),
+                modifier = Modifier.padding(20.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Row(
@@ -151,7 +154,7 @@ fun AvatarPickerDialog(
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 1.5.sp,
-                        color = Color(0xFFA1A1AA)
+                        color = AppTheme.colors.textMuted
                     )
                     IconButton(
                         onClick = onDismiss,
@@ -160,7 +163,7 @@ fun AvatarPickerDialog(
                         Icon(
                             imageVector = Icons.Default.Close,
                             contentDescription = "Close",
-                            tint = Color(0xFFA1A1AA)
+                            tint = AppTheme.colors.textMuted
                         )
                     }
                 }
@@ -170,11 +173,14 @@ fun AvatarPickerDialog(
                 // Current avatar preview
                 Box(
                     modifier = Modifier
-                        .size(80.dp)
+                        .size(82.dp)
                         .clip(CircleShape)
                         .background(
                             Brush.linearGradient(
-                                listOf(Color(0xFF3B82F6).copy(alpha = 0.3f), Color(0xFF18181B))
+                                listOf(
+                                    AppTheme.colors.primary.copy(alpha = 0.25f),
+                                    AppTheme.colors.surfaceElevated
+                                )
                             )
                         ),
                     contentAlignment = Alignment.Center
@@ -182,7 +188,7 @@ fun AvatarPickerDialog(
                     UserAvatarView(avatarId = currentAvatarId, size = 76.dp)
                 }
 
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(18.dp))
 
                 // Upload custom picture button
                 Button(
@@ -196,14 +202,15 @@ fun AvatarPickerDialog(
                         .height(46.dp),
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF27272A),
-                        contentColor = Color.White
+                        containerColor = AppTheme.colors.surfaceElevated,
+                        contentColor = AppTheme.colors.textPrimary
                     ),
-                    border = BorderStroke(1.dp, Color(0xFF3F3F46))
+                    border = BorderStroke(1.dp, AppTheme.colors.border)
                 ) {
                     Icon(
                         imageVector = Icons.Default.AddPhotoAlternate,
                         contentDescription = null,
+                        tint = AppTheme.colors.primary,
                         modifier = Modifier.size(20.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
@@ -214,20 +221,20 @@ fun AvatarPickerDialog(
 
                 Text(
                     text = "Or choose an avatar icon",
-                    color = Color(0xFF71717A),
+                    color = AppTheme.colors.textSecondary,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Medium,
                     modifier = Modifier.align(Alignment.Start)
                 )
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(10.dp))
 
-                // Grid of preset icons
+                // Grid of preset icons (adaptive grid to avoid overflow on any screen)
                 LazyVerticalGrid(
-                    columns = GridCells.Fixed(6),
+                    columns = GridCells.Adaptive(minSize = 44.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(190.dp),
+                        .height(180.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
@@ -236,20 +243,20 @@ fun AvatarPickerDialog(
                         val emoji = avatar.removePrefix("icon:")
                         Surface(
                             modifier = Modifier
-                                .size(44.dp)
+                                .aspectRatio(1f)
                                 .clickable {
                                     onAvatarSelected(avatar)
                                     onDismiss()
                                 },
                             shape = CircleShape,
-                            color = if (isSelected) Color(0xFF3B82F6).copy(alpha = 0.25f) else Color(0xFF27272A),
+                            color = if (isSelected) AppTheme.colors.primary.copy(alpha = 0.22f) else AppTheme.colors.surfaceElevated,
                             border = BorderStroke(
                                 if (isSelected) 2.dp else 1.dp,
-                                if (isSelected) Color(0xFF3B82F6) else Color(0xFF3F3F46)
+                                if (isSelected) AppTheme.colors.primary else AppTheme.colors.border
                             )
                         ) {
                             Box(contentAlignment = Alignment.Center) {
-                                Text(text = emoji, fontSize = 22.sp)
+                                Text(text = emoji, fontSize = 20.sp)
                             }
                         }
                     }
@@ -258,3 +265,4 @@ fun AvatarPickerDialog(
         }
     }
 }
+

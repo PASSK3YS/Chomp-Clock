@@ -224,13 +224,27 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun getBuiltInReleaseNotes(): List<ReleaseNoteItem> {
-        val currentVersion = BuildConfig.VERSION_NAME.ifEmpty { "1.2.1" }
+        val currentVersion = BuildConfig.VERSION_NAME.ifEmpty { "1.2.2" }
         return listOf(
             ReleaseNoteItem(
-                version = "v1.2.1",
+                version = "v1.2.2",
                 date = "Latest Verified Build (August 2026)",
-                title = "Google Material You (M3) Theming & Dynamic Color",
+                title = "Settings Layout Refinements & Material You Polishing",
                 isLatestVerified = true,
+                highlights = listOf(
+                    "Polished Profile & Avatar section layout with balanced input fields and clean gender selector",
+                    "Adaptive Material You dynamic color palette swatches with fluid column width distribution",
+                    "Dynamic theme token integration in Avatar picker dialog supporting light and dark modes",
+                    "Responsive preset icon grid in Avatar dialog preventing clipping on compact screens",
+                    "General stability and visual hierarchy enhancements across Settings"
+                ),
+                fullBody = "Version 1.2.2 resolves layout and alignment issues in Settings, delivering an enhanced Profile & Avatar configuration layout, adaptive Material You dynamic color palette swatches, and full theme integration for avatar selection."
+            ),
+            ReleaseNoteItem(
+                version = "v1.2.1",
+                date = "August 2026",
+                title = "Google Material You (M3) Theming & Dynamic Color",
+                isLatestVerified = false,
                 highlights = listOf(
                     "Google Material You dynamic color system with wallpaper-derived Monet theming (Android 12+)",
                     "Complete Dark & Light theme mode support with harmonized M3 color tokens",
