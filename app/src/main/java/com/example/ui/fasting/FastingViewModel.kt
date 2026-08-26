@@ -9,6 +9,7 @@ import com.example.FastingService
 import com.example.data.local.AppDatabase
 import com.example.data.local.entity.FastSession
 import com.example.data.model.DetailedAchievement
+import com.example.data.model.StreakDetails
 import com.example.util.AchievementEngine
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
@@ -37,21 +38,32 @@ class FastingViewModel(application: Application) : AndroidViewModel(application)
     val achievements = db.achievementDao().getAllAchievements()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val currentStreak = pastSessions.map { sessions ->
-        if (sessions.isEmpty()) 0 else sessions.size
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
+    val streakDetails: StateFlow<StreakDetails> = combine(
+        pastSessions,
+        _isFasting
+    ) { sessions, isFasting ->
+        AchievementEngine.computeStreakDetails(sessions, isFasting)
+    }.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5000),
+        AchievementEngine.computeStreakDetails(emptyList(), false)
+    )
+
+    val currentStreak: StateFlow<Int> = streakDetails.map { it.currentStreak }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
     val detailedAchievements: StateFlow<List<DetailedAchievement>> = combine(
         pastSessions,
         db.weightEntryDao().getAllEntries(),
         db.foodEntryDao().getAllEntries(),
-        currentStreak
-    ) { sessions, weights, foods, streak ->
+        streakDetails
+    ) { sessions, weights, foods, streakInfo ->
         AchievementEngine.computeAchievements(
             fastSessions = sessions,
             weightEntries = weights,
             foodEntries = foods,
-            currentStreakDays = streak
+            currentStreakDays = streakInfo.currentStreak,
+            longestStreakDays = streakInfo.longestStreak
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 

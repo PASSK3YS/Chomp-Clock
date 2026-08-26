@@ -271,13 +271,28 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun getBuiltInReleaseNotes(): List<ReleaseNoteItem> {
-        val currentVersion = BuildConfig.VERSION_NAME.ifEmpty { "1.2.4" }
+        val currentVersion = BuildConfig.VERSION_NAME.ifEmpty { "1.2.5" }
         return listOf(
             ReleaseNoteItem(
-                version = "v1.2.4",
+                version = "v1.2.5",
                 date = "Latest Verified Build (August 2026)",
-                title = "Custom Adaptive Launcher Icon & Release Keystore Alignment",
+                title = "Expanded Achievements System & Interactive Daily Streak Popup",
                 isLatestVerified = true,
+                highlights = listOf(
+                    "Comprehensive multi-category achievements (Sessions, Duration, Streaks, Nutrition, and Body Metrics)",
+                    "Interactive Daily Streak dialog popup when tapping the fire badge on the Fasting screen",
+                    "Dynamic streak tier titles (Weekly Flame, Fortnight Hero, Iron Will, Centennial Legend) and motivational guidance",
+                    "7-Day consistency tracker with rolling day badges and completion indicators",
+                    "4-Stat streak metrics grid (Current Streak, Best Streak, Fasting Days, Lifetime Hours Fasted)",
+                    "Next milestone goal progress bar and scientific health insights for badge unlocks"
+                ),
+                fullBody = "Version 1.2.5 expands the achievements system into an exhaustive multi-category catalog with tiered rarities and adds an interactive Daily Streak dialog featuring 7-day consistency tracking, milestone countdowns, and rich lifetime statistics."
+            ),
+            ReleaseNoteItem(
+                version = "v1.2.4",
+                date = "August 2026",
+                title = "Custom Adaptive Launcher Icon & Release Keystore Alignment",
+                isLatestVerified = false,
                 highlights = listOf(
                     "Custom Material You adaptive launcher icon featuring modern fasting stopwatch dial with emerald/amber gradient progress arc and bite detailing",
                     "Automated release signing keystore configuration for seamless in-place APK updates from GitHub Releases",

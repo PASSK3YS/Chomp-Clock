@@ -5,6 +5,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -25,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -33,9 +35,11 @@ import androidx.compose.ui.window.Dialog
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.data.local.entity.FastSession
+import com.example.data.model.AchievementCategory
 import com.example.data.repository.UserPreferences
 import com.example.ui.components.AchievementsDialog
 import com.example.ui.components.AvatarPickerDialog
+import com.example.ui.components.DailyStreakDialog
 import com.example.ui.components.UserAvatarView
 import com.example.ui.settings.SettingsViewModel
 import com.example.ui.theme.AppTheme
@@ -54,10 +58,13 @@ fun FastingScreen(
     val targetDuration by viewModel.targetDurationMillis.collectAsState()
     val pastSessions by viewModel.pastSessions.collectAsState()
     val streak by viewModel.currentStreak.collectAsState()
+    val streakDetails by viewModel.streakDetails.collectAsState()
     val detailedAchievements by viewModel.detailedAchievements.collectAsState()
 
     var showLogPastDialog by remember { mutableStateOf(false) }
+    var showStreakDialog by remember { mutableStateOf(false) }
     var showAchievementsDialog by remember { mutableStateOf(false) }
+    var achievementsInitialCategory by remember { mutableStateOf(AchievementCategory.ALL) }
     var showCustomFastDialog by remember { mutableStateOf(false) }
     var showAvatarPicker by remember { mutableStateOf(false) }
     var showMetabolicStatesDialog by remember { mutableStateOf(false) }
@@ -186,10 +193,31 @@ fun FastingScreen(
         )
     }
 
+    if (showStreakDialog) {
+        DailyStreakDialog(
+            streakDetails = streakDetails,
+            isFastingNow = isFasting,
+            onDismiss = { showStreakDialog = false },
+            onViewAchievements = {
+                showStreakDialog = false
+                achievementsInitialCategory = AchievementCategory.STREAKS
+                showAchievementsDialog = true
+            },
+            onStartFast = {
+                showStreakDialog = false
+                showCustomFastDialog = true
+            }
+        )
+    }
+
     if (showAchievementsDialog) {
         AchievementsDialog(
             achievements = detailedAchievements,
-            onDismiss = { showAchievementsDialog = false }
+            initialCategory = achievementsInitialCategory,
+            onDismiss = {
+                showAchievementsDialog = false
+                achievementsInitialCategory = AchievementCategory.ALL
+            }
         )
     }
 
@@ -277,29 +305,42 @@ fun FastingScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Surface(
+                    onClick = { showStreakDialog = true },
                     color = AppTheme.colors.surfaceElevated,
                     shape = RoundedCornerShape(50),
-                    border = BorderStroke(1.dp, AppTheme.colors.border)
+                    border = BorderStroke(1.dp, Color(0xFFF97316).copy(alpha = 0.5f)),
+                    modifier = Modifier
+                        .testTag("daily_streak_button")
+                        .animateContentSize()
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        modifier = Modifier.padding(horizontal = 11.dp, vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("🔥", fontSize = 12.sp, modifier = Modifier.padding(end = 4.dp))
+                        Text("🔥", fontSize = 13.sp, modifier = Modifier.padding(end = 4.dp))
                         Text(
                             text = "$streak",
                             color = AppTheme.colors.warning,
                             fontWeight = FontWeight.Bold,
                             style = MaterialTheme.typography.bodyMedium
                         )
+                        if (streakDetails.isTodayCompleted) {
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("✓", fontSize = 10.sp, color = AppTheme.colors.success, fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
                 Surface(
-                    onClick = { showAchievementsDialog = true },
+                    onClick = {
+                        achievementsInitialCategory = AchievementCategory.ALL
+                        showAchievementsDialog = true
+                    },
                     color = AppTheme.colors.surfaceElevated,
                     shape = CircleShape,
                     border = BorderStroke(1.dp, AppTheme.colors.border),
-                    modifier = Modifier.size(38.dp)
+                    modifier = Modifier
+                        .size(38.dp)
+                        .testTag("achievements_button")
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(

@@ -35,9 +35,10 @@ import com.example.data.model.DetailedAchievement
 @Composable
 fun AchievementsDialog(
     achievements: List<DetailedAchievement>,
+    initialCategory: AchievementCategory = AchievementCategory.ALL,
     onDismiss: () -> Unit
 ) {
-    var selectedCategory by remember { mutableStateOf(AchievementCategory.ALL) }
+    var selectedCategory by remember(initialCategory) { mutableStateOf(initialCategory) }
     var selectedAchievementForDetail by remember { mutableStateOf<DetailedAchievement?>(null) }
 
     val filteredAchievements = remember(achievements, selectedCategory) {

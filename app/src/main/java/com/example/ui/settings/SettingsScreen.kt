@@ -1598,7 +1598,7 @@ fun SettingsScreen(
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = "Installed: v${BuildConfig.VERSION_NAME.ifEmpty { "1.2.4" }}",
+                                text = "Installed: v${BuildConfig.VERSION_NAME.ifEmpty { "1.2.5" }}",
                                 fontWeight = FontWeight.SemiBold,
                                 fontSize = 12.sp,
                                 color = AppTheme.colors.textPrimary
@@ -1881,7 +1881,7 @@ fun SettingsScreen(
                                     }
                                     Spacer(modifier = Modifier.height(6.dp))
                                     Text(
-                                        text = "Your app is running the latest verified release build (v${BuildConfig.VERSION_NAME.ifEmpty { "1.2.4" }}), checked against PASSK3YS/Chomp-Clock on GitHub.",
+                                        text = "Your app is running the latest verified release build (v${BuildConfig.VERSION_NAME.ifEmpty { "1.2.5" }}), checked against PASSK3YS/Chomp-Clock on GitHub.",
                                         color = AppTheme.colors.textSecondary,
                                         fontSize = 11.sp
                                     )
@@ -1929,7 +1929,7 @@ fun SettingsScreen(
                                         Icon(Icons.Default.CheckCircle, contentDescription = null, tint = AppTheme.colors.success, modifier = Modifier.size(18.dp))
                                         Spacer(modifier = Modifier.width(6.dp))
                                         Text(
-                                            text = "App is Up to Date (v${BuildConfig.VERSION_NAME.ifEmpty { "1.2.4" }})",
+                                            text = "App is Up to Date (v${BuildConfig.VERSION_NAME.ifEmpty { "1.2.5" }})",
                                             color = AppTheme.colors.textPrimary,
                                             fontWeight = FontWeight.Bold,
                                             fontSize = 13.sp

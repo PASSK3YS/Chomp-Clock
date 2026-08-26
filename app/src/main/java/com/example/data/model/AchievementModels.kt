@@ -34,3 +34,27 @@ data class DetailedAchievement(
     val progressPercent: Float
         get() = if (targetProgress <= 0) 1f else (currentProgress.toFloat() / targetProgress).coerceIn(0f, 1f)
 }
+
+data class DayStreakItem(
+    val dayName: String,
+    val dateLabel: String,
+    val isCompleted: Boolean,
+    val isToday: Boolean,
+    val dayTimestamp: Long
+)
+
+data class StreakDetails(
+    val currentStreak: Int,
+    val longestStreak: Int,
+    val totalFastingDays: Int,
+    val totalFastingHours: Float,
+    val isTodayCompleted: Boolean,
+    val isFastActiveNow: Boolean,
+    val nextMilestone: Int,
+    val daysToNextMilestone: Int,
+    val milestoneProgress: Float,
+    val streakTierTitle: String,
+    val streakTierEmoji: String,
+    val motivationalText: String,
+    val recent7Days: List<DayStreakItem>
+)
