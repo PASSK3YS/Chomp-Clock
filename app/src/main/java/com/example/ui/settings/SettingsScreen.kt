@@ -6,6 +6,8 @@ import android.os.Build
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -323,7 +325,7 @@ fun SettingsScreen(
 
     if (showReleaseNotesDialog) {
         val releaseNotes = viewModel.getBuiltInReleaseNotes()
-        val currentVer = BuildConfig.VERSION_NAME.ifEmpty { "1.1.5" }
+        val currentVer = BuildConfig.VERSION_NAME.ifEmpty { "1.2.3" }
         ReleaseNotesDialog(
             releaseNotes = releaseNotes,
             currentVersion = currentVer,
@@ -355,7 +357,7 @@ fun SettingsScreen(
                 border = BorderStroke(1.dp, AppTheme.colors.primary.copy(alpha = 0.4f))
             ) {
                 Text(
-                    text = "v${BuildConfig.VERSION_NAME.ifEmpty { "1.1.3" }}",
+                    text = "v${BuildConfig.VERSION_NAME.ifEmpty { "1.2.3" }}",
                     color = AppTheme.colors.primaryVariant,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
@@ -1596,7 +1598,7 @@ fun SettingsScreen(
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = "Installed: v${BuildConfig.VERSION_NAME.ifEmpty { "1.2.2" }}",
+                                text = "Installed: v${BuildConfig.VERSION_NAME.ifEmpty { "1.2.3" }}",
                                 fontWeight = FontWeight.SemiBold,
                                 fontSize = 12.sp,
                                 color = AppTheme.colors.textPrimary
@@ -1613,19 +1615,34 @@ fun SettingsScreen(
                 Spacer(modifier = Modifier.height(12.dp))
 
                 // Action buttons: Check for Updates & View Release Notes Popup
+                val isChecking = updateCheckState is UpdateCheckState.Checking
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Button(
                         onClick = { viewModel.checkForUpdates() },
-                        colors = ButtonDefaults.buttonColors(containerColor = AppTheme.colors.primary),
+                        enabled = !isChecking,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = AppTheme.colors.primary,
+                            disabledContainerColor = AppTheme.colors.primary.copy(alpha = 0.6f)
+                        ),
                         shape = RoundedCornerShape(10.dp),
                         modifier = Modifier.weight(1f)
                     ) {
-                        Icon(Icons.Default.Refresh, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("Check Updates", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        if (isChecking) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                color = Color.White,
+                                strokeWidth = 2.dp
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Checking...", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        } else {
+                            Icon(Icons.Default.Refresh, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Check for Updates", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        }
                     }
 
                     OutlinedButton(
@@ -1643,213 +1660,303 @@ fun SettingsScreen(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // Update Result States
-                when (val state = updateCheckState) {
-                    is UpdateCheckState.Idle -> {
-                        Text(
-                            text = "Tap 'Check Updates' to query latest releases from PASSK3YS/Chomp-Clock on GitHub.",
-                            color = AppTheme.colors.textMuted,
-                            fontSize = 11.sp
-                        )
-                    }
-                    is UpdateCheckState.Checking -> {
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = AppTheme.colors.surfaceElevated,
-                            border = BorderStroke(1.dp, AppTheme.colors.primary.copy(alpha = 0.3f)),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(12.dp),
-                                horizontalArrangement = Arrangement.Center,
-                                verticalAlignment = Alignment.CenterVertically
+                // Update Result States with Animated Transition
+                AnimatedContent(
+                    targetState = updateCheckState,
+                    transitionSpec = { fadeIn(animationSpec = tween(220)) togetherWith fadeOut(animationSpec = tween(180)) },
+                    label = "UpdateCheckAnimation"
+                ) { state ->
+                    when (state) {
+                        is UpdateCheckState.Idle -> {
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = AppTheme.colors.surfaceElevated,
+                                border = BorderStroke(1.dp, AppTheme.colors.border),
+                                modifier = Modifier.fillMaxWidth()
                             ) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(18.dp),
-                                    color = AppTheme.colors.primary,
-                                    strokeWidth = 2.dp
-                                )
-                                Spacer(modifier = Modifier.width(10.dp))
-                                Text(
-                                    "Checking github.com/PASSK3YS/Chomp-Clock/releases...",
-                                    color = AppTheme.colors.textSecondary,
-                                    fontSize = 12.sp
-                                )
-                            }
-                        }
-                    }
-                    is UpdateCheckState.UpdateAvailable -> {
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = AppTheme.colors.success.copy(alpha = 0.12f),
-                            border = BorderStroke(1.dp, AppTheme.colors.success.copy(alpha = 0.45f)),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Column(modifier = Modifier.padding(14.dp)) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
                                     Icon(
-                                        Icons.Default.Star,
+                                        Icons.Default.Info,
                                         contentDescription = null,
-                                        tint = Color(0xFFFFB300),
-                                        modifier = Modifier.size(20.dp)
+                                        tint = AppTheme.colors.textMuted,
+                                        modifier = Modifier.size(16.dp)
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text(
-                                        text = "New Update Available: ${state.latestVersion}",
-                                        fontWeight = FontWeight.Bold,
-                                        color = AppTheme.colors.textPrimary,
-                                        fontSize = 14.sp
+                                        text = "Tap 'Check for Updates' to verify against PASSK3YS/Chomp-Clock on GitHub.",
+                                        color = AppTheme.colors.textMuted,
+                                        fontSize = 11.sp
                                     )
                                 }
-                                Spacer(modifier = Modifier.height(6.dp))
-                                Text(
-                                    text = state.releaseNotes,
-                                    color = AppTheme.colors.textSecondary,
-                                    fontSize = 12.sp,
-                                    maxLines = 3
-                                )
-                                Spacer(modifier = Modifier.height(10.dp))
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            }
+                        }
+                        is UpdateCheckState.Checking -> {
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = AppTheme.colors.primary.copy(alpha = 0.08f),
+                                border = BorderStroke(1.dp, AppTheme.colors.primary.copy(alpha = 0.35f)),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(14.dp)
                                 ) {
-                                    Button(
-                                        onClick = {
-                                            val url = state.downloadUrl ?: state.htmlUrl
-                                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-                                            context.startActivity(intent)
-                                        },
-                                        colors = ButtonDefaults.buttonColors(containerColor = AppTheme.colors.success),
-                                        shape = RoundedCornerShape(8.dp),
-                                        modifier = Modifier.weight(1f)
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Icon(Icons.Default.Download, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text("Download APK", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            CircularProgressIndicator(
+                                                modifier = Modifier.size(18.dp),
+                                                color = AppTheme.colors.primary,
+                                                strokeWidth = 2.5.dp
+                                            )
+                                            Spacer(modifier = Modifier.width(10.dp))
+                                            Text(
+                                                text = "Checking for Updates...",
+                                                fontWeight = FontWeight.Bold,
+                                                color = AppTheme.colors.textPrimary,
+                                                fontSize = 13.sp
+                                            )
+                                        }
+                                        Surface(
+                                            shape = RoundedCornerShape(6.dp),
+                                            color = AppTheme.colors.primary.copy(alpha = 0.15f)
+                                        ) {
+                                            Text(
+                                                text = "Step ${state.step}/3",
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = AppTheme.colors.primary,
+                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                            )
+                                        }
                                     }
 
-                                    OutlinedButton(
-                                        onClick = { showReleaseNotesDialog = true },
-                                        shape = RoundedCornerShape(8.dp),
-                                        border = BorderStroke(1.dp, AppTheme.colors.border),
-                                        modifier = Modifier.weight(1f)
+                                    Spacer(modifier = Modifier.height(8.dp))
+
+                                    Text(
+                                        text = state.statusMessage,
+                                        color = AppTheme.colors.textSecondary,
+                                        fontSize = 12.sp
+                                    )
+
+                                    Spacer(modifier = Modifier.height(10.dp))
+
+                                    LinearProgressIndicator(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(4.dp),
+                                        color = AppTheme.colors.primary,
+                                        trackColor = AppTheme.colors.primary.copy(alpha = 0.15f)
+                                    )
+
+                                    Spacer(modifier = Modifier.height(8.dp))
+
+                                    Text(
+                                        text = "Querying repository: PASSK3YS / Chomp-Clock",
+                                        color = AppTheme.colors.textMuted,
+                                        fontSize = 10.sp
+                                    )
+                                }
+                            }
+                        }
+                        is UpdateCheckState.UpdateAvailable -> {
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = AppTheme.colors.success.copy(alpha = 0.12f),
+                                border = BorderStroke(1.dp, AppTheme.colors.success.copy(alpha = 0.45f)),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(modifier = Modifier.padding(14.dp)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(
+                                            Icons.Default.Star,
+                                            contentDescription = null,
+                                            tint = Color(0xFFFFB300),
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = "New Update Available: ${state.latestVersion}",
+                                            fontWeight = FontWeight.Bold,
+                                            color = AppTheme.colors.textPrimary,
+                                            fontSize = 14.sp
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Text(
+                                        text = state.releaseNotes,
+                                        color = AppTheme.colors.textSecondary,
+                                        fontSize = 12.sp,
+                                        maxLines = 3
+                                    )
+                                    Spacer(modifier = Modifier.height(10.dp))
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
-                                        Text("Release Notes", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                        Button(
+                                            onClick = {
+                                                val url = state.downloadUrl ?: state.htmlUrl
+                                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                                                context.startActivity(intent)
+                                            },
+                                            colors = ButtonDefaults.buttonColors(containerColor = AppTheme.colors.success),
+                                            shape = RoundedCornerShape(8.dp),
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Icon(Icons.Default.Download, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("Download APK", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                                        }
+
+                                        OutlinedButton(
+                                            onClick = { showReleaseNotesDialog = true },
+                                            shape = RoundedCornerShape(8.dp),
+                                            border = BorderStroke(1.dp, AppTheme.colors.border),
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Text("Release Notes", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                        }
                                     }
                                 }
                             }
                         }
-                    }
-                    is UpdateCheckState.UpToDate -> {
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = AppTheme.colors.success.copy(alpha = 0.1f),
-                            border = BorderStroke(1.dp, AppTheme.colors.success.copy(alpha = 0.35f)),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Column(modifier = Modifier.padding(14.dp)) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        Icons.Default.CheckCircle,
-                                        contentDescription = null,
-                                        tint = AppTheme.colors.success,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
-                                        text = "App is Up to Date (${state.currentVersion})",
-                                        color = AppTheme.colors.textPrimary,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 13.sp
-                                    )
-                                }
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    text = "Your app is running the latest verified build (v${BuildConfig.VERSION_NAME.ifEmpty { "1.2.2" }}), checked against PASSK3YS/Chomp-Clock GitHub repository.",
-                                    color = AppTheme.colors.textSecondary,
-                                    fontSize = 11.sp
-                                )
-                                Spacer(modifier = Modifier.height(10.dp))
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    OutlinedButton(
-                                        onClick = { showReleaseNotesDialog = true },
-                                        shape = RoundedCornerShape(8.dp),
-                                        border = BorderStroke(1.dp, AppTheme.colors.border),
-                                        modifier = Modifier.weight(1f)
+                        is UpdateCheckState.UpToDate -> {
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = AppTheme.colors.success.copy(alpha = 0.1f),
+                                border = BorderStroke(1.dp, AppTheme.colors.success.copy(alpha = 0.35f)),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(modifier = Modifier.padding(14.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Icon(Icons.Default.Description, contentDescription = null, tint = AppTheme.colors.primary, modifier = Modifier.size(14.dp))
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text("Release Notes", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(
+                                                Icons.Default.CheckCircle,
+                                                contentDescription = null,
+                                                tint = AppTheme.colors.success,
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text(
+                                                text = "App is Up to Date (${state.currentVersion})",
+                                                color = AppTheme.colors.textPrimary,
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 13.sp
+                                            )
+                                        }
+                                        Surface(
+                                            shape = RoundedCornerShape(6.dp),
+                                            color = AppTheme.colors.success.copy(alpha = 0.2f)
+                                        ) {
+                                            Text(
+                                                text = "Verified",
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = AppTheme.colors.success,
+                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                            )
+                                        }
                                     }
-
-                                    OutlinedButton(
-                                        onClick = {
-                                            uriHandler.openUri(state.htmlUrl)
-                                        },
-                                        shape = RoundedCornerShape(8.dp),
-                                        border = BorderStroke(1.dp, AppTheme.colors.border),
-                                        modifier = Modifier.weight(1f)
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Text(
+                                        text = "Your app is running the latest verified release build (v${BuildConfig.VERSION_NAME.ifEmpty { "1.2.3" }}), checked against PASSK3YS/Chomp-Clock on GitHub.",
+                                        color = AppTheme.colors.textSecondary,
+                                        fontSize = 11.sp
+                                    )
+                                    Spacer(modifier = Modifier.height(10.dp))
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
-                                        Icon(Icons.Default.OpenInNew, contentDescription = null, tint = AppTheme.colors.textMuted, modifier = Modifier.size(14.dp))
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text("GitHub Releases", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                        OutlinedButton(
+                                            onClick = { showReleaseNotesDialog = true },
+                                            shape = RoundedCornerShape(8.dp),
+                                            border = BorderStroke(1.dp, AppTheme.colors.border),
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Icon(Icons.Default.Description, contentDescription = null, tint = AppTheme.colors.primary, modifier = Modifier.size(14.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("Release Notes", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                        }
+
+                                        OutlinedButton(
+                                            onClick = {
+                                                uriHandler.openUri(state.htmlUrl)
+                                            },
+                                            shape = RoundedCornerShape(8.dp),
+                                            border = BorderStroke(1.dp, AppTheme.colors.border),
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Icon(Icons.Default.OpenInNew, contentDescription = null, tint = AppTheme.colors.textMuted, modifier = Modifier.size(14.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("GitHub Releases", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                        }
                                     }
                                 }
                             }
                         }
-                    }
-                    is UpdateCheckState.NoReleasesFound, is UpdateCheckState.Error -> {
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = AppTheme.colors.surfaceElevated,
-                            border = BorderStroke(1.dp, AppTheme.colors.border),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Column(modifier = Modifier.padding(14.dp)) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(Icons.Default.CheckCircle, contentDescription = null, tint = AppTheme.colors.success, modifier = Modifier.size(18.dp))
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text(
-                                        text = "App is Up to Date (v${BuildConfig.VERSION_NAME.ifEmpty { "1.2.2" }})",
-                                        color = AppTheme.colors.textPrimary,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 13.sp
-                                    )
-                                }
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    text = "Latest verified build active. You can view all release notes or open the GitHub releases page directly.",
-                                    color = AppTheme.colors.textSecondary,
-                                    fontSize = 11.sp
-                                )
-                                Spacer(modifier = Modifier.height(10.dp))
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    OutlinedButton(
-                                        onClick = { showReleaseNotesDialog = true },
-                                        shape = RoundedCornerShape(8.dp),
-                                        border = BorderStroke(1.dp, AppTheme.colors.border),
-                                        modifier = Modifier.weight(1f)
-                                    ) {
-                                        Text("Release Notes", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        is UpdateCheckState.NoReleasesFound, is UpdateCheckState.Error -> {
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = AppTheme.colors.surfaceElevated,
+                                border = BorderStroke(1.dp, AppTheme.colors.border),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(modifier = Modifier.padding(14.dp)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(Icons.Default.CheckCircle, contentDescription = null, tint = AppTheme.colors.success, modifier = Modifier.size(18.dp))
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = "App is Up to Date (v${BuildConfig.VERSION_NAME.ifEmpty { "1.2.3" }})",
+                                            color = AppTheme.colors.textPrimary,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 13.sp
+                                        )
                                     }
-
-                                    OutlinedButton(
-                                        onClick = {
-                                            uriHandler.openUri("https://github.com/PASSK3YS/Chomp-Clock/releases")
-                                        },
-                                        shape = RoundedCornerShape(8.dp),
-                                        border = BorderStroke(1.dp, AppTheme.colors.border),
-                                        modifier = Modifier.weight(1f)
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = "Latest verified build active. You can view all release notes or open the GitHub releases page directly.",
+                                        color = AppTheme.colors.textSecondary,
+                                        fontSize = 11.sp
+                                    )
+                                    Spacer(modifier = Modifier.height(10.dp))
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
-                                        Text("GitHub Releases", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                        OutlinedButton(
+                                            onClick = { showReleaseNotesDialog = true },
+                                            shape = RoundedCornerShape(8.dp),
+                                            border = BorderStroke(1.dp, AppTheme.colors.border),
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Text("Release Notes", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                        }
+
+                                        OutlinedButton(
+                                            onClick = {
+                                                uriHandler.openUri("https://github.com/PASSK3YS/Chomp-Clock/releases")
+                                            },
+                                            shape = RoundedCornerShape(8.dp),
+                                            border = BorderStroke(1.dp, AppTheme.colors.border),
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Text("GitHub Releases", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                        }
                                     }
                                 }
                             }

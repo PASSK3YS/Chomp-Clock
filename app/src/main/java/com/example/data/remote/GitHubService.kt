@@ -22,6 +22,13 @@ interface GitHubService {
         @Path("repo") repo: String = "Chomp-Clock"
     ): List<GitHubReleaseResponse>
 
+    @Headers("Accept: application/vnd.github.v3+json", "User-Agent: ChompClock-Android-App")
+    @GET("repos/{owner}/{repo}/tags")
+    suspend fun getTags(
+        @Path("owner") owner: String = "PASSK3YS",
+        @Path("repo") repo: String = "Chomp-Clock"
+    ): List<GitHubTagResponse>
+
     companion object {
         private const val BASE_URL = "https://api.github.com/"
 
@@ -34,6 +41,13 @@ interface GitHubService {
         }
     }
 }
+
+data class GitHubTagResponse(
+    @Json(name = "name") val name: String?,
+    @Json(name = "zipball_url") val zipballUrl: String?,
+    @Json(name = "tarball_url") val tarballUrl: String?,
+    @Json(name = "node_id") val nodeId: String?
+)
 
 data class GitHubReleaseResponse(
     @Json(name = "id") val id: Long?,
