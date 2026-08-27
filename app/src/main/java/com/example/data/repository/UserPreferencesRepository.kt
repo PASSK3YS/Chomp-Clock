@@ -55,6 +55,24 @@ enum class ThemeMode(val displayName: String, val description: String) {
     }
 }
 
+enum class WeighInFrequency(val displayName: String, val shortDescription: String) {
+    WEEKLY("Every Week", "Weekly on selected day"),
+    BI_WEEKLY("Bi-Weekly", "Every 2 weeks"),
+    MONTHLY("Monthly", "Every 4 weeks"),
+    DAILY("Every Day", "Daily at selected time");
+
+    companion object {
+        fun fromString(value: String?): WeighInFrequency {
+            return when (value?.uppercase()) {
+                "BI_WEEKLY", "BIWEEKLY", "FORTNIGHTLY", "2_WEEKS" -> BI_WEEKLY
+                "MONTHLY", "4_WEEKS" -> MONTHLY
+                "DAILY", "EVERY_DAY", "DAY" -> DAILY
+                else -> WEEKLY
+            }
+        }
+    }
+}
+
 class UserPreferencesRepository(private val context: Context) {
 
     private val dataStore = context.dataStore
@@ -86,6 +104,14 @@ class UserPreferencesRepository(private val context: Context) {
             val useCustomCalories = preferences[USE_CUSTOM_CALORIES] ?: false
             val customDailyCalories = preferences[CUSTOM_DAILY_CALORIES] ?: 2000
             
+            val weighInReminderEnabled = preferences[WEIGH_IN_REMINDER_ENABLED] ?: false
+            val weighInFrequencyStr = preferences[WEIGH_IN_FREQUENCY] ?: "WEEKLY"
+            val weighInFrequency = WeighInFrequency.fromString(weighInFrequencyStr)
+            val weighInDayOfWeek = preferences[WEIGH_IN_DAY_OF_WEEK] ?: java.util.Calendar.MONDAY
+            val weighInHour = preferences[WEIGH_IN_HOUR] ?: 8
+            val weighInMinute = preferences[WEIGH_IN_MINUTE] ?: 0
+            val weighInLastNotifiedMillis = preferences[WEIGH_IN_LAST_NOTIFIED_MILLIS] ?: 0L
+
             UserPreferences(
                 username = username,
                 heightCm = heightCm,
@@ -101,7 +127,13 @@ class UserPreferencesRepository(private val context: Context) {
                 profilePicUri = profilePicUri,
                 avatarId = avatarId,
                 useCustomCalories = useCustomCalories,
-                customDailyCalories = customDailyCalories
+                customDailyCalories = customDailyCalories,
+                weighInReminderEnabled = weighInReminderEnabled,
+                weighInFrequency = weighInFrequency,
+                weighInDayOfWeek = weighInDayOfWeek,
+                weighInHour = weighInHour,
+                weighInMinute = weighInMinute,
+                weighInLastNotifiedMillis = weighInLastNotifiedMillis
             )
         }
 
@@ -198,6 +230,30 @@ class UserPreferencesRepository(private val context: Context) {
         }
     }
 
+    suspend fun updateWeighInReminder(
+        enabled: Boolean,
+        frequency: WeighInFrequency,
+        dayOfWeek: Int,
+        hour: Int,
+        minute: Int
+    ) {
+        dataStore.edit {
+            it[WEIGH_IN_REMINDER_ENABLED] = enabled
+            it[WEIGH_IN_FREQUENCY] = frequency.name
+            it[WEIGH_IN_DAY_OF_WEEK] = dayOfWeek
+            it[WEIGH_IN_HOUR] = hour
+            it[WEIGH_IN_MINUTE] = minute
+        }
+    }
+
+    suspend fun updateWeighInReminderEnabled(enabled: Boolean) {
+        dataStore.edit { it[WEIGH_IN_REMINDER_ENABLED] = enabled }
+    }
+
+    suspend fun updateWeighInLastNotifiedMillis(millis: Long) {
+        dataStore.edit { it[WEIGH_IN_LAST_NOTIFIED_MILLIS] = millis }
+    }
+
     suspend fun resetAllPreferences() {
         dataStore.edit { it.clear() }
     }
@@ -218,6 +274,12 @@ class UserPreferencesRepository(private val context: Context) {
         val AVATAR_ID = stringPreferencesKey("avatar_id")
         val USE_CUSTOM_CALORIES = booleanPreferencesKey("use_custom_calories")
         val CUSTOM_DAILY_CALORIES = intPreferencesKey("custom_daily_calories")
+        val WEIGH_IN_REMINDER_ENABLED = booleanPreferencesKey("weigh_in_reminder_enabled")
+        val WEIGH_IN_FREQUENCY = stringPreferencesKey("weigh_in_frequency")
+        val WEIGH_IN_DAY_OF_WEEK = intPreferencesKey("weigh_in_day_of_week")
+        val WEIGH_IN_HOUR = intPreferencesKey("weigh_in_hour")
+        val WEIGH_IN_MINUTE = intPreferencesKey("weigh_in_minute")
+        val WEIGH_IN_LAST_NOTIFIED_MILLIS = longPreferencesKey("weigh_in_last_notified_millis")
     }
 }
 
@@ -236,5 +298,11 @@ data class UserPreferences(
     val profilePicUri: String? = null,
     val avatarId: String = "icon:🔥",
     val useCustomCalories: Boolean = false,
-    val customDailyCalories: Int = 2000
+    val customDailyCalories: Int = 2000,
+    val weighInReminderEnabled: Boolean = false,
+    val weighInFrequency: WeighInFrequency = WeighInFrequency.WEEKLY,
+    val weighInDayOfWeek: Int = java.util.Calendar.MONDAY,
+    val weighInHour: Int = 8,
+    val weighInMinute: Int = 0,
+    val weighInLastNotifiedMillis: Long = 0L
 )

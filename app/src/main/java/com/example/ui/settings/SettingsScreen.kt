@@ -38,13 +38,16 @@ import com.example.BuildConfig
 import com.example.data.repository.HeightUnit
 import com.example.data.repository.ThemeMode
 import com.example.data.repository.UserPreferences
+import com.example.data.repository.WeighInFrequency
 import com.example.data.repository.WeightUnit
 import com.example.ui.components.AvatarPickerDialog
 import com.example.ui.components.UserAvatarView
 import com.example.ui.theme.AppTheme
+import com.example.ui.weight.WeighInReminderDialog
 import com.example.ui.weight.WeightViewModel
 import com.example.util.CalorieWeightCalculator
 import com.example.util.InAppUpdateInstaller
+import com.example.util.WeightReminderManager
 import com.example.util.WeightTrajectory
 import com.example.util.WeightUtils
 import kotlinx.coroutines.launch
@@ -110,6 +113,7 @@ fun SettingsScreen(
     var showDeleteConfirmDialog by remember { mutableStateOf(false) }
     var showImportConfirmDialog by remember { mutableStateOf(false) }
     var showReleaseNotesDialog by remember { mutableStateOf(false) }
+    var showWeighInReminderDialog by remember { mutableStateOf(false) }
     var pendingImportUri by remember { mutableStateOf<Uri?>(null) }
     var pendingExportPayload by remember { mutableStateOf<String?>(null) }
     var backupResultSummary by remember { mutableStateOf<String?>(null) }
@@ -333,6 +337,25 @@ fun SettingsScreen(
             releaseNotes = releaseNotes,
             currentVersion = currentVer,
             onDismiss = { showReleaseNotesDialog = false }
+        )
+    }
+
+    if (showWeighInReminderDialog) {
+        WeighInReminderDialog(
+            userPrefs = userPrefs,
+            onDismiss = { showWeighInReminderDialog = false },
+            onSaveReminder = { enabled, frequency, dayOfWeek, hour, minute ->
+                weightViewModel.updateWeighInReminder(
+                    enabled = enabled,
+                    frequency = frequency,
+                    dayOfWeek = dayOfWeek,
+                    hour = hour,
+                    minute = minute
+                )
+            },
+            onSendTestNotification = {
+                weightViewModel.sendTestReminder()
+            }
         )
     }
 
@@ -1345,6 +1368,88 @@ fun SettingsScreen(
                         )
                     )
                 }
+
+                Spacer(modifier = Modifier.height(14.dp))
+                HorizontalDivider(color = AppTheme.colors.borderLight)
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Weigh-In Reminder Settings Row
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable { showWeighInReminderDialog = true }
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = "Weigh-In Reminder",
+                                color = AppTheme.colors.textPrimary,
+                                fontWeight = FontWeight.Medium
+                            )
+                            if (p.weighInReminderEnabled) {
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Surface(
+                                    shape = RoundedCornerShape(4.dp),
+                                    color = AppTheme.colors.primary.copy(alpha = 0.2f)
+                                ) {
+                                    Text(
+                                        text = p.weighInFrequency.displayName,
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = AppTheme.colors.primary,
+                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                    )
+                                }
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(2.dp))
+                        val reminderDesc = if (p.weighInReminderEnabled) {
+                            val timeCal = Calendar.getInstance().apply {
+                                set(Calendar.HOUR_OF_DAY, p.weighInHour)
+                                set(Calendar.MINUTE, p.weighInMinute)
+                            }
+                            val timeStr = SimpleDateFormat("h:mm a", Locale.getDefault()).format(timeCal.time)
+                            if (p.weighInFrequency == WeighInFrequency.DAILY) {
+                                "Every day at $timeStr"
+                            } else {
+                                "${p.weighInFrequency.displayName} on ${WeightReminderManager.getDayOfWeekDisplayName(p.weighInDayOfWeek, short = true)} at $timeStr"
+                            }
+                        } else {
+                            "Remind you on specific days & times to weigh in"
+                        }
+                        Text(
+                            text = reminderDesc,
+                            color = AppTheme.colors.textMuted,
+                            fontSize = 12.sp
+                        )
+                    }
+
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(
+                            onClick = { showWeighInReminderDialog = true },
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Tune,
+                                contentDescription = "Configure Schedule",
+                                tint = AppTheme.colors.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                        Switch(
+                            checked = p.weighInReminderEnabled,
+                            onCheckedChange = { weightViewModel.setWeighInReminderEnabled(it) },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color.White,
+                                checkedTrackColor = AppTheme.colors.primary
+                            )
+                        )
+                    }
+                }
             }
         }
 
@@ -1601,7 +1706,7 @@ fun SettingsScreen(
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = "Installed: v${BuildConfig.VERSION_NAME.ifEmpty { "1.2.6" }}",
+                                text = "Installed: v${BuildConfig.VERSION_NAME.ifEmpty { "1.3.0" }}",
                                 fontWeight = FontWeight.SemiBold,
                                 fontSize = 12.sp,
                                 color = AppTheme.colors.textPrimary

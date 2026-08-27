@@ -318,13 +318,28 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun getBuiltInReleaseNotes(): List<ReleaseNoteItem> {
-        val currentVersion = BuildConfig.VERSION_NAME.ifEmpty { "1.2.7" }
+        val currentVersion = BuildConfig.VERSION_NAME.ifEmpty { "1.3.0" }
         return listOf(
             ReleaseNoteItem(
-                version = "v1.2.7",
+                version = "v1.3.0",
                 date = "Latest Verified Build (August 2026)",
-                title = "Full-Width Slide-Up Popup Menus & In-App APK Package Installer",
+                title = "Scheduled Weigh-In Reminders & Notification System",
                 isLatestVerified = true,
+                highlights = listOf(
+                    "Custom recurring weigh-in reminders (Weekly, Bi-Weekly, Monthly, or Daily)",
+                    "Day-of-the-week selector with active visual highlights and custom time picker with quick presets (7:00 AM - 9:00 AM)",
+                    "Live upcoming reminder preview banner and 1-tap instant notification testing",
+                    "Reliable exact AlarmManager scheduling with automatic restoration on device boot and timezone changes",
+                    "Direct notification tap action navigating directly to the Weight tracking tab",
+                    "Weigh-In Reminder management cards in both Weight Screen and Settings"
+                ),
+                fullBody = "Version 1.3.0 introduces a comprehensive Weigh-In Reminder and Notification system, allowing users to configure customizable schedules (Weekly, Bi-Weekly, Monthly, or Daily), choose preferred weigh-in days and times, test notifications, and receive timely alarms with automatic boot persistence."
+            ),
+            ReleaseNoteItem(
+                version = "v1.2.7",
+                date = "August 2026",
+                title = "Full-Width Slide-Up Popup Menus & In-App APK Package Installer",
+                isLatestVerified = false,
                 highlights = listOf(
                     "Full-screen width slide-up bottom sheets with smooth spring enter & exit animations for all popup menus",
                     "Integrated in-app APK downloader & installer with live progress bar and direct package installer launch",

@@ -25,9 +25,21 @@ import com.example.ui.weight.WeightScreen
 
 @Composable
 fun MainScreen(
-    userPrefs: UserPreferences
+    userPrefs: UserPreferences,
+    initialNavTarget: String? = null,
+    onNavTargetConsumed: () -> Unit = {}
 ) {
     val navController = rememberNavController()
+
+    LaunchedEffect(initialNavTarget) {
+        if (initialNavTarget != null && initialNavTarget.isNotEmpty()) {
+            navController.navigate(initialNavTarget) {
+                popUpTo("fasting") { saveState = true }
+                launchSingleTop = true
+            }
+            onNavTargetConsumed()
+        }
+    }
     
     Scaffold(
         containerColor = AppTheme.colors.background,

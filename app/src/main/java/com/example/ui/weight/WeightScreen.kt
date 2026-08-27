@@ -10,8 +10,13 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.NotificationsActive
+import androidx.compose.material.icons.filled.NotificationsNone
 import androidx.compose.material.icons.filled.TrendingDown
 import androidx.compose.material.icons.filled.TrendingUp
+import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.outlined.AccessTime
+import androidx.compose.material.icons.outlined.Event
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -26,12 +31,14 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.data.local.entity.WeightEntry
 import com.example.data.repository.HeightUnit
 import com.example.data.repository.UserPreferences
+import com.example.data.repository.WeighInFrequency
 import com.example.data.repository.WeightUnit
 import com.example.ui.components.AvatarPickerDialog
 import com.example.ui.components.UserAvatarView
 import com.example.ui.settings.SettingsViewModel
 import com.example.ui.theme.AppTheme
 import com.example.util.CalorieWeightCalculator
+import com.example.util.WeightReminderManager
 import com.example.util.WeightTrajectory
 import com.example.util.WeightUtils
 import java.text.SimpleDateFormat
@@ -53,6 +60,7 @@ fun WeightScreen(
     var showAvatarPicker by remember { mutableStateOf(false) }
     var selectedDateMillis by remember { mutableStateOf(System.currentTimeMillis()) }
     var entryToDelete by remember { mutableStateOf<WeightEntry?>(null) }
+    var showReminderDialog by remember { mutableStateOf(false) }
 
     val username = userPrefs?.username ?: "User"
     val avatarId = userPrefs?.avatarId
@@ -163,6 +171,25 @@ fun WeightScreen(
             onDismiss = { showAvatarPicker = false },
             onAvatarSelected = { newAvatar ->
                 settingsViewModel.updateAvatarId(newAvatar)
+            }
+        )
+    }
+
+    if (showReminderDialog) {
+        WeighInReminderDialog(
+            userPrefs = userPrefs,
+            onDismiss = { showReminderDialog = false },
+            onSaveReminder = { enabled, frequency, dayOfWeek, hour, minute ->
+                viewModel.updateWeighInReminder(
+                    enabled = enabled,
+                    frequency = frequency,
+                    dayOfWeek = dayOfWeek,
+                    hour = hour,
+                    minute = minute
+                )
+            },
+            onSendTestNotification = {
+                viewModel.sendTestReminder()
             }
         )
     }
@@ -351,6 +378,176 @@ fun WeightScreen(
                             color = AppTheme.colors.textSecondary,
                             fontSize = 11.sp
                         )
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Weigh-In Reminder Banner Card
+        val isReminderOn = userPrefs?.weighInReminderEnabled ?: false
+        val reminderFrequency = userPrefs?.weighInFrequency ?: WeighInFrequency.WEEKLY
+        val reminderDay = userPrefs?.weighInDayOfWeek ?: Calendar.MONDAY
+        val reminderHour = userPrefs?.weighInHour ?: 8
+        val reminderMinute = userPrefs?.weighInMinute ?: 0
+
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { showReminderDialog = true },
+            colors = CardDefaults.cardColors(containerColor = AppTheme.colors.surface),
+            border = BorderStroke(
+                1.dp,
+                if (isReminderOn) AppTheme.colors.primary.copy(alpha = 0.4f) else AppTheme.colors.border
+            ),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = if (isReminderOn) AppTheme.colors.primary.copy(alpha = 0.15f) else AppTheme.colors.surfaceElevated,
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = if (isReminderOn) Icons.Default.NotificationsActive else Icons.Default.NotificationsNone,
+                                    contentDescription = null,
+                                    tint = if (isReminderOn) AppTheme.colors.primary else AppTheme.colors.textMuted,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = "WEIGH-IN REMINDER",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isReminderOn) AppTheme.colors.primary else AppTheme.colors.textMuted,
+                                    letterSpacing = 1.1.sp
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Surface(
+                                    shape = RoundedCornerShape(4.dp),
+                                    color = if (isReminderOn) AppTheme.colors.primary.copy(alpha = 0.2f) else AppTheme.colors.border.copy(alpha = 0.5f)
+                                ) {
+                                    Text(
+                                        text = if (isReminderOn) "ACTIVE" else "OFF",
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        color = if (isReminderOn) AppTheme.colors.primary else AppTheme.colors.textMuted,
+                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(2.dp))
+                            val timeCal = Calendar.getInstance().apply {
+                                set(Calendar.HOUR_OF_DAY, reminderHour)
+                                set(Calendar.MINUTE, reminderMinute)
+                            }
+                            val formattedTime = SimpleDateFormat("h:mm a", Locale.getDefault()).format(timeCal.time)
+                            val scheduleSummary = if (isReminderOn) {
+                                if (reminderFrequency == WeighInFrequency.DAILY) {
+                                    "Daily at $formattedTime"
+                                } else {
+                                    "${reminderFrequency.displayName} on ${WeightReminderManager.getDayOfWeekDisplayName(reminderDay, short = true)} at $formattedTime"
+                                }
+                            } else {
+                                "Set weekly or bi-weekly reminder"
+                            }
+                            Text(
+                                text = scheduleSummary,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = AppTheme.colors.textPrimary
+                            )
+                        }
+                    }
+
+                    Switch(
+                        checked = isReminderOn,
+                        onCheckedChange = { checked ->
+                            viewModel.setWeighInReminderEnabled(checked)
+                        },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.White,
+                            checkedTrackColor = AppTheme.colors.primary,
+                            uncheckedThumbColor = AppTheme.colors.textMuted,
+                            uncheckedTrackColor = AppTheme.colors.border
+                        )
+                    )
+                }
+
+                if (isReminderOn) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = AppTheme.colors.surfaceElevated,
+                        border = BorderStroke(1.dp, AppTheme.colors.border.copy(alpha = 0.5f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 10.dp, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Event,
+                                    contentDescription = null,
+                                    tint = AppTheme.colors.primary,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                val nextPreview = WeightReminderManager.formatNextReminderPreview(
+                                    frequency = reminderFrequency,
+                                    dayOfWeek = reminderDay,
+                                    hour = reminderHour,
+                                    minute = reminderMinute
+                                )
+                                Text(
+                                    text = "Next: $nextPreview",
+                                    fontSize = 11.sp,
+                                    color = AppTheme.colors.textSecondary,
+                                    maxLines = 1
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.clickable { showReminderDialog = true }
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Tune,
+                                    contentDescription = "Edit",
+                                    tint = AppTheme.colors.primary,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = "Edit",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = AppTheme.colors.primary
+                                )
+                            }
+                        }
                     }
                 }
             }
