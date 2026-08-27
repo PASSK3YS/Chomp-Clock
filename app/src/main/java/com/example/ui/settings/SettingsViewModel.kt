@@ -318,13 +318,26 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun getBuiltInReleaseNotes(): List<ReleaseNoteItem> {
-        val currentVersion = BuildConfig.VERSION_NAME.ifEmpty { "1.3.0" }
+        val currentVersion = BuildConfig.VERSION_NAME.ifEmpty { "1.3.1" }
         return listOf(
             ReleaseNoteItem(
-                version = "v1.3.0",
+                version = "v1.3.1",
                 date = "Latest Verified Build (August 2026)",
-                title = "Scheduled Weigh-In Reminders & Notification System",
+                title = "Popup Dialog Usability & Sticky Action Controls",
                 isLatestVerified = true,
+                highlights = listOf(
+                    "Fixed popup menu clipping across Custom Food, Weigh-In Reminders, and Calorie Goal dialogs",
+                    "Pinned sticky action bars to ensure save & log buttons remain visible above virtual keyboards",
+                    "Smooth independent scrolling for form inputs, portion multipliers, and day selectors",
+                    "Performance optimizations and dialog layout responsiveness enhancements"
+                ),
+                fullBody = "Version 1.3.1 delivers enhanced popup dialog usability with pinned bottom action bars, independent content scrolling to prevent keyboard clipping, and overall stability improvements."
+            ),
+            ReleaseNoteItem(
+                version = "v1.3.0",
+                date = "August 2026",
+                title = "Scheduled Weigh-In Reminders & Notification System",
+                isLatestVerified = false,
                 highlights = listOf(
                     "Custom recurring weigh-in reminders (Weekly, Bi-Weekly, Monthly, or Daily)",
                     "Day-of-the-week selector with active visual highlights and custom time picker with quick presets (7:00 AM - 9:00 AM)",

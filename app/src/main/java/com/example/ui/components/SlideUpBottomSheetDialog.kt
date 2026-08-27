@@ -127,6 +127,7 @@ fun SlideUpBottomSheetDialog(
                             .fillMaxSize()
                             .navigationBarsPadding()
                             .imePadding()
+                            .padding(bottom = 28.dp)
                     ) {
                         if (showDragHandle) {
                             Box(

@@ -1378,11 +1378,11 @@ fun UkFoodSearchDialog(
 
     SlideUpBottomSheetDialog(
         onDismissRequest = onDismiss,
-        maxHeightFraction = 0.92f
+        maxHeightFraction = 0.94f
     ) { dismissWithAnim ->
         Column(
             modifier = Modifier
-                .fillMaxWidth()
+                .fillMaxSize()
                 .padding(horizontal = 18.dp, vertical = 6.dp)
         ) {
             // Top header
@@ -1969,9 +1969,14 @@ fun UkFoodSearchDialog(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .weight(1f)
-                                .verticalScroll(rememberScrollState())
                         ) {
-                            OutlinedTextField(
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .weight(1f)
+                                    .verticalScroll(rememberScrollState())
+                            ) {
+                                OutlinedTextField(
                                 value = customName,
                                 onValueChange = { customName = it },
                                 label = { Text("Food / Beverage Name") },
@@ -2454,58 +2459,71 @@ fun UkFoodSearchDialog(
                                 }
                             }
 
-                            Spacer(modifier = Modifier.height(10.dp))
+                                Spacer(modifier = Modifier.height(14.dp))
+                            }
 
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            // Sticky Bottom Action Bar
+                            Surface(
+                                color = AppTheme.colors.surface,
+                                modifier = Modifier.fillMaxWidth()
                             ) {
-                                OutlinedButton(
-                                    onClick = {
-                                        val cal = if (baseCalories > 0f) baseCalories.toInt() else autoCalculatedCalories
-                                        val baseServ = "${baseGrams.toInt()}$customServingUnit"
-                                        viewModel.saveFoodItemDirectly(
-                                            name = customName,
-                                            servingSize = baseServ,
-                                            calories = cal,
-                                            defaultMealType = selectedMeal,
-                                            barcode = null,
-                                            brandOrSupermarket = customBrand.ifBlank { "Custom Food" }
-                                        )
-                                        Toast.makeText(context, "Saved '$customName' ($baseServ = $cal kcal) ⭐", Toast.LENGTH_SHORT).show()
-                                        activeTab = 1 // Switch to Saved tab
-                                    },
-                                    enabled = customName.isNotBlank() && (customBaseCaloriesText.isNotBlank() || autoCalculatedCalories > 0),
-                                    shape = RoundedCornerShape(10.dp),
-                                    modifier = Modifier
-                                        .weight(0.9f)
-                                        .height(46.dp)
+                                Column(
+                                    modifier = Modifier.padding(top = 4.dp, bottom = 4.dp)
                                 ) {
-                                    Icon(Icons.Default.Star, contentDescription = null, tint = Color(0xFFFFB300), modifier = Modifier.size(15.dp))
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text("Save Baseline", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                }
+                                    HorizontalDivider(color = AppTheme.colors.border.copy(alpha = 0.5f), thickness = 1.dp)
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        OutlinedButton(
+                                            onClick = {
+                                                val cal = if (baseCalories > 0f) baseCalories.toInt() else autoCalculatedCalories
+                                                val baseServ = "${baseGrams.toInt()}$customServingUnit"
+                                                viewModel.saveFoodItemDirectly(
+                                                    name = customName,
+                                                    servingSize = baseServ,
+                                                    calories = cal,
+                                                    defaultMealType = selectedMeal,
+                                                    barcode = null,
+                                                    brandOrSupermarket = customBrand.ifBlank { "Custom Food" }
+                                                )
+                                                Toast.makeText(context, "Saved '$customName' ($baseServ = $cal kcal) ⭐", Toast.LENGTH_SHORT).show()
+                                                activeTab = 1 // Switch to Saved tab
+                                            },
+                                            enabled = customName.isNotBlank() && (customBaseCaloriesText.isNotBlank() || autoCalculatedCalories > 0),
+                                            shape = RoundedCornerShape(10.dp),
+                                            modifier = Modifier
+                                                .weight(0.9f)
+                                                .height(46.dp)
+                                        ) {
+                                            Icon(Icons.Default.Star, contentDescription = null, tint = Color(0xFFFFB300), modifier = Modifier.size(15.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("Save Baseline", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                        }
 
-                                Button(
-                                    onClick = {
-                                        onSave(
-                                            customName,
-                                            effectiveServing,
-                                            autoCalculatedCalories,
-                                            selectedMeal,
-                                            null,
-                                            customBrand.ifBlank { "Custom Food" },
-                                            saveCustomForFuture
-                                        )
-                                    },
-                                    enabled = customName.isNotBlank() && (customBaseCaloriesText.isNotBlank() || autoCalculatedCalories > 0),
-                                    modifier = Modifier
-                                        .weight(1.1f)
-                                        .height(46.dp),
-                                    shape = RoundedCornerShape(10.dp),
-                                    colors = ButtonDefaults.buttonColors(containerColor = AppTheme.colors.primary)
-                                ) {
-                                    Text("Log $autoCalculatedCalories kcal to $selectedMeal", fontWeight = FontWeight.Bold, fontSize = 11.sp, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        Button(
+                                            onClick = {
+                                                onSave(
+                                                    customName,
+                                                    effectiveServing,
+                                                    autoCalculatedCalories,
+                                                    selectedMeal,
+                                                    null,
+                                                    customBrand.ifBlank { "Custom Food" },
+                                                    saveCustomForFuture
+                                                )
+                                            },
+                                            enabled = customName.isNotBlank() && (customBaseCaloriesText.isNotBlank() || autoCalculatedCalories > 0),
+                                            modifier = Modifier
+                                                .weight(1.1f)
+                                                .height(46.dp),
+                                            shape = RoundedCornerShape(10.dp),
+                                            colors = ButtonDefaults.buttonColors(containerColor = AppTheme.colors.primary)
+                                        ) {
+                                            Text("Log $autoCalculatedCalories kcal to $selectedMeal", fontWeight = FontWeight.Bold, fontSize = 11.sp, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -2728,15 +2746,15 @@ fun LogScannedProductDialog(
 
     SlideUpBottomSheetDialog(
         onDismissRequest = onDismiss,
-        maxHeightFraction = 0.90f
+        maxHeightFraction = 0.92f
     ) { dismissWithAnim ->
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 6.dp)
+            modifier = Modifier.fillMaxSize()
         ) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 6.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -2761,8 +2779,15 @@ fun LogScannedProductDialog(
                 }
             }
 
-                Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(4.dp))
 
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 20.dp)
+            ) {
                 // Status Banner
                 if (!isFound) {
                     Surface(
@@ -3013,33 +3038,49 @@ fun LogScannedProductDialog(
                 }
 
                 Spacer(modifier = Modifier.height(14.dp))
+            }
 
-                Button(
-                    onClick = {
-                        onConfirm(
-                            editableName,
-                            finalServing,
-                            scaledCalories,
-                            selectedMeal,
-                            product.barcode,
-                            product.brandOrSupermarket,
-                            saveForFuture
-                        )
-                    },
-                    enabled = editableName.isNotBlank() && editableCalories.isNotBlank(),
+            // Sticky Bottom Action Button
+            Surface(
+                color = AppTheme.colors.surface,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(48.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = AppTheme.colors.success)
+                        .padding(horizontal = 20.dp, vertical = 8.dp)
                 ) {
-                    Icon(Icons.Default.Check, contentDescription = null, tint = Color.White)
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("Confirm & Log $scaledCalories kcal", color = Color.White, fontWeight = FontWeight.Bold)
+                    HorizontalDivider(color = AppTheme.colors.border.copy(alpha = 0.5f), thickness = 1.dp)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Button(
+                        onClick = {
+                            onConfirm(
+                                editableName,
+                                finalServing,
+                                scaledCalories,
+                                selectedMeal,
+                                product.barcode,
+                                product.brandOrSupermarket,
+                                saveForFuture
+                            )
+                        },
+                        enabled = editableName.isNotBlank() && editableCalories.isNotBlank(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = AppTheme.colors.success)
+                    ) {
+                        Icon(Icons.Default.Check, contentDescription = null, tint = Color.White)
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Confirm & Log $scaledCalories kcal", color = Color.White, fontWeight = FontWeight.Bold)
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
                 }
             }
         }
     }
+}
 
 @Composable
 fun EditCalorieGoalDialog(
@@ -3070,16 +3111,28 @@ fun EditCalorieGoalDialog(
         )
     }
 
-    SlideUpBottomSheetDialog(onDismissRequest = onDismiss) { dismissWithAnim ->
-        Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) {
-            Text(
-                text = "SET DAILY CALORIE GOAL",
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Bold,
-                color = AppTheme.colors.textMuted,
-                letterSpacing = 1.2.sp
-            )
-            Spacer(modifier = Modifier.height(14.dp))
+    SlideUpBottomSheetDialog(
+        onDismissRequest = onDismiss,
+        maxHeightFraction = 0.90f
+    ) { dismissWithAnim ->
+        Column(
+            modifier = Modifier.fillMaxSize()
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 20.dp, vertical = 8.dp)
+            ) {
+                Text(
+                    text = "SET DAILY CALORIE GOAL",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = AppTheme.colors.textMuted,
+                    letterSpacing = 1.2.sp
+                )
+                Spacer(modifier = Modifier.height(14.dp))
 
             // Mode 1: Auto BMR
             Surface(
@@ -3265,27 +3318,43 @@ fun EditCalorieGoalDialog(
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(14.dp))
+        }
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End
+        // Pinned Bottom Action Bar
+        Surface(
+            color = AppTheme.colors.surface,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 8.dp)
             ) {
-                TextButton(onClick = dismissWithAnim) {
-                    Text("Cancel", color = AppTheme.colors.textMuted)
-                }
-                Spacer(modifier = Modifier.width(8.dp))
-                Button(
-                    onClick = {
-                        val parsed = calorieInput.toIntOrNull() ?: 2000
-                        onSave(useCustom, if (parsed > 0) parsed else 2000)
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = AppTheme.colors.primary),
-                    shape = RoundedCornerShape(10.dp)
+                HorizontalDivider(color = AppTheme.colors.border.copy(alpha = 0.5f), thickness = 1.dp)
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
                 ) {
-                    Text("Save Goal", fontWeight = FontWeight.Bold, color = Color.White)
+                    TextButton(onClick = dismissWithAnim) {
+                        Text("Cancel", color = AppTheme.colors.textMuted)
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(
+                        onClick = {
+                            val parsed = calorieInput.toIntOrNull() ?: 2000
+                            onSave(useCustom, if (parsed > 0) parsed else 2000)
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = AppTheme.colors.primary),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Text("Save Goal", fontWeight = FontWeight.Bold, color = Color.White)
+                    }
                 }
+                Spacer(modifier = Modifier.height(4.dp))
             }
         }
     }
+}
 }

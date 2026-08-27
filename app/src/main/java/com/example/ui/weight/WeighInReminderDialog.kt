@@ -121,14 +121,13 @@ fun WeighInReminderDialog(
         maxHeightFraction = 0.92f
     ) { dismissWithAnimation ->
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp, vertical = 8.dp)
-                .verticalScroll(rememberScrollState())
+            modifier = Modifier.fillMaxSize()
         ) {
-            // Header
+            // Fixed Header
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 6.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -136,22 +135,22 @@ fun WeighInReminderDialog(
                     Surface(
                         shape = CircleShape,
                         color = AppTheme.colors.primary.copy(alpha = 0.15f),
-                        modifier = Modifier.size(42.dp)
+                        modifier = Modifier.size(40.dp)
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Icon(
                                 imageVector = Icons.Default.NotificationsActive,
                                 contentDescription = null,
                                 tint = AppTheme.colors.primary,
-                                modifier = Modifier.size(22.dp)
+                                modifier = Modifier.size(20.dp)
                             )
                         }
                     }
-                    Spacer(modifier = Modifier.width(12.dp))
+                    Spacer(modifier = Modifier.width(10.dp))
                     Column {
                         Text(
                             text = "Weigh-In Reminder",
-                            fontSize = 20.sp,
+                            fontSize = 18.sp,
                             fontWeight = FontWeight.Bold,
                             color = AppTheme.colors.textPrimary
                         )
@@ -163,7 +162,7 @@ fun WeighInReminderDialog(
                     }
                 }
 
-                IconButton(onClick = { dismissWithAnimation() }) {
+                IconButton(onClick = { dismissWithAnimation() }, modifier = Modifier.size(32.dp)) {
                     Icon(
                         imageVector = Icons.Default.Close,
                         contentDescription = "Close",
@@ -172,9 +171,16 @@ fun WeighInReminderDialog(
                 }
             }
 
-            Spacer(modifier = Modifier.height(18.dp))
+            Spacer(modifier = Modifier.height(6.dp))
 
-            // Main Switch Card
+            // Scrollable Content
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 20.dp)
+            ) {
             Surface(
                 shape = RoundedCornerShape(16.dp),
                 color = if (isEnabled) AppTheme.colors.primary.copy(alpha = 0.10f) else AppTheme.colors.surfaceElevated,
@@ -575,82 +581,95 @@ fun WeighInReminderDialog(
                 }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // Test Notification & Actions
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                OutlinedButton(
-                    onClick = {
-                        if (!hasNotificationPermission && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                            permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                        } else {
-                            onSendTestNotification()
-                            Toast.makeText(context, "Test notification sent! Check your notification bar.", Toast.LENGTH_SHORT).show()
-                        }
-                    },
-                    shape = RoundedCornerShape(12.dp),
-                    border = BorderStroke(1.dp, AppTheme.colors.border),
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(48.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.Notifications,
-                        contentDescription = null,
-                        tint = AppTheme.colors.textSecondary,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = "Test Now",
-                        fontSize = 13.sp,
-                        color = AppTheme.colors.textPrimary,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
-
-                Button(
-                    onClick = {
-                        onSaveReminder(
-                            isEnabled,
-                            selectedFrequency,
-                            selectedDayOfWeek,
-                            selectedHour,
-                            selectedMinute
-                        )
-                        Toast.makeText(
-                            context,
-                            if (isEnabled) "Weigh-in reminder saved!" else "Reminders turned off",
-                            Toast.LENGTH_SHORT
-                        ).show()
-                        dismissWithAnimation()
-                    },
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = AppTheme.colors.primary),
-                    modifier = Modifier
-                        .weight(1.3f)
-                        .height(48.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Check,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = "Save Schedule",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
-                    )
-                }
-            }
-
             Spacer(modifier = Modifier.height(16.dp))
         }
+
+        // Pinned Bottom Action Bar
+        Surface(
+            color = AppTheme.colors.surface,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 8.dp)
+            ) {
+                HorizontalDivider(color = AppTheme.colors.border.copy(alpha = 0.5f), thickness = 1.dp)
+                Spacer(modifier = Modifier.height(10.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = {
+                            if (!hasNotificationPermission && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                            } else {
+                                onSendTestNotification()
+                                Toast.makeText(context, "Test notification sent! Check your notification bar.", Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(1.dp, AppTheme.colors.border),
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(48.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Notifications,
+                            contentDescription = null,
+                            tint = AppTheme.colors.textSecondary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "Test Now",
+                            fontSize = 13.sp,
+                            color = AppTheme.colors.textPrimary,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+
+                    Button(
+                        onClick = {
+                            onSaveReminder(
+                                isEnabled,
+                                selectedFrequency,
+                                selectedDayOfWeek,
+                                selectedHour,
+                                selectedMinute
+                            )
+                            Toast.makeText(
+                                context,
+                                if (isEnabled) "Weigh-in reminder saved!" else "Reminders turned off",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                            dismissWithAnimation()
+                        },
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = AppTheme.colors.primary),
+                        modifier = Modifier
+                            .weight(1.3f)
+                            .height(48.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Check,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "Save Schedule",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+            }
+        }
     }
+}
 }
