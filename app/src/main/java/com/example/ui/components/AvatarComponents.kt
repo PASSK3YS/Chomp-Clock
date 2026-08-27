@@ -131,133 +131,126 @@ fun AvatarPickerDialog(
         }
     }
 
-    Dialog(onDismissRequest = onDismiss) {
-        Surface(
-            shape = RoundedCornerShape(24.dp),
-            color = AppTheme.colors.surface,
-            border = BorderStroke(1.dp, AppTheme.colors.border),
+    SlideUpBottomSheetDialog(onDismissRequest = onDismiss) { dismissWithAnim ->
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 16.dp)
+                .padding(horizontal = 20.dp, vertical = 8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Column(
-                modifier = Modifier.padding(20.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "CHOOSE AVATAR",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.5.sp,
-                        color = AppTheme.colors.textMuted
-                    )
-                    IconButton(
-                        onClick = onDismiss,
-                        modifier = Modifier.size(32.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Close,
-                            contentDescription = "Close",
-                            tint = AppTheme.colors.textMuted
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Current avatar preview
-                Box(
-                    modifier = Modifier
-                        .size(82.dp)
-                        .clip(CircleShape)
-                        .background(
-                            Brush.linearGradient(
-                                listOf(
-                                    AppTheme.colors.primary.copy(alpha = 0.25f),
-                                    AppTheme.colors.surfaceElevated
-                                )
-                            )
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    UserAvatarView(avatarId = currentAvatarId, size = 76.dp)
-                }
-
-                Spacer(modifier = Modifier.height(18.dp))
-
-                // Upload custom picture button
-                Button(
-                    onClick = {
-                        photoPickerLauncher.launch(
-                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                        )
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(46.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = AppTheme.colors.surfaceElevated,
-                        contentColor = AppTheme.colors.textPrimary
-                    ),
-                    border = BorderStroke(1.dp, AppTheme.colors.border)
+                Text(
+                    text = "CHOOSE AVATAR",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.5.sp,
+                    color = AppTheme.colors.textMuted
+                )
+                IconButton(
+                    onClick = dismissWithAnim,
+                    modifier = Modifier.size(32.dp)
                 ) {
                     Icon(
-                        imageVector = Icons.Default.AddPhotoAlternate,
-                        contentDescription = null,
-                        tint = AppTheme.colors.primary,
-                        modifier = Modifier.size(20.dp)
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Close",
+                        tint = AppTheme.colors.textMuted
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Upload Photo from Gallery", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                 }
+            }
 
-                Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
-                Text(
-                    text = "Or choose an avatar icon",
-                    color = AppTheme.colors.textSecondary,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Medium,
-                    modifier = Modifier.align(Alignment.Start)
-                )
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                // Grid of preset icons (adaptive grid to avoid overflow on any screen)
-                LazyVerticalGrid(
-                    columns = GridCells.Adaptive(minSize = 44.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(180.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    items(PRESET_AVATARS) { avatar ->
-                        val isSelected = currentAvatarId == avatar
-                        val emoji = avatar.removePrefix("icon:")
-                        Surface(
-                            modifier = Modifier
-                                .aspectRatio(1f)
-                                .clickable {
-                                    onAvatarSelected(avatar)
-                                    onDismiss()
-                                },
-                            shape = CircleShape,
-                            color = if (isSelected) AppTheme.colors.primary.copy(alpha = 0.22f) else AppTheme.colors.surfaceElevated,
-                            border = BorderStroke(
-                                if (isSelected) 2.dp else 1.dp,
-                                if (isSelected) AppTheme.colors.primary else AppTheme.colors.border
+            // Current avatar preview
+            Box(
+                modifier = Modifier
+                    .size(82.dp)
+                    .clip(CircleShape)
+                    .background(
+                        Brush.linearGradient(
+                            listOf(
+                                AppTheme.colors.primary.copy(alpha = 0.25f),
+                                AppTheme.colors.surfaceElevated
                             )
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Text(text = emoji, fontSize = 20.sp)
-                            }
+                        )
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                UserAvatarView(avatarId = currentAvatarId, size = 76.dp)
+            }
+
+            Spacer(modifier = Modifier.height(18.dp))
+
+            // Upload custom picture button
+            Button(
+                onClick = {
+                    photoPickerLauncher.launch(
+                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                    )
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(46.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = AppTheme.colors.surfaceElevated,
+                    contentColor = AppTheme.colors.textPrimary
+                ),
+                border = BorderStroke(1.dp, AppTheme.colors.border)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.AddPhotoAlternate,
+                    contentDescription = null,
+                    tint = AppTheme.colors.primary,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Upload Photo from Gallery", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Text(
+                text = "Or choose an avatar icon",
+                color = AppTheme.colors.textSecondary,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier.align(Alignment.Start)
+            )
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Grid of preset icons (adaptive grid to avoid overflow on any screen)
+            LazyVerticalGrid(
+                columns = GridCells.Adaptive(minSize = 44.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(180.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(PRESET_AVATARS) { avatar ->
+                    val isSelected = currentAvatarId == avatar
+                    val emoji = avatar.removePrefix("icon:")
+                    Surface(
+                        modifier = Modifier
+                            .aspectRatio(1f)
+                            .clickable {
+                                onAvatarSelected(avatar)
+                                dismissWithAnim()
+                            },
+                        shape = CircleShape,
+                        color = if (isSelected) AppTheme.colors.primary.copy(alpha = 0.22f) else AppTheme.colors.surfaceElevated,
+                        border = BorderStroke(
+                            if (isSelected) 2.dp else 1.dp,
+                            if (isSelected) AppTheme.colors.primary else AppTheme.colors.border
+                        )
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text(text = emoji, fontSize = 20.sp)
                         }
                     }
                 }

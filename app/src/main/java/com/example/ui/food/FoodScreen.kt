@@ -40,6 +40,7 @@ import com.example.data.repository.UserPreferences
 import com.example.data.repository.WeightUnit
 import com.example.ui.components.AvatarPickerDialog
 import com.example.ui.components.BarcodeScannerScreen
+import com.example.ui.components.SlideUpBottomSheetDialog
 import com.example.ui.components.UserAvatarView
 import com.example.ui.settings.SettingsViewModel
 import com.example.ui.theme.AppTheme
@@ -1375,45 +1376,40 @@ fun UkFoodSearchDialog(
     var isManualServingLabel by remember { mutableStateOf(false) }
     var saveCustomForFuture by remember { mutableStateOf(true) }
 
-    Dialog(onDismissRequest = onDismiss) {
-        Surface(
-            shape = RoundedCornerShape(24.dp),
-            color = AppTheme.colors.surface,
-            border = BorderStroke(1.dp, AppTheme.colors.border),
+    SlideUpBottomSheetDialog(
+        onDismissRequest = onDismiss,
+        maxHeightFraction = 0.92f
+    ) { dismissWithAnim ->
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .fillMaxHeight(0.90f)
+                .padding(horizontal = 18.dp, vertical = 6.dp)
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(18.dp)
+            // Top header
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                // Top header
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text(
-                            "LOG FOOD & DRINKS",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = AppTheme.colors.textMuted,
-                            letterSpacing = 1.2.sp
-                        )
-                        Text(
-                            "UK Database, Saved Items & Custom",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = AppTheme.colors.primary,
-                            fontSize = 11.sp
-                        )
-                    }
-                    IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
-                        Icon(Icons.Default.Close, contentDescription = "Close", tint = AppTheme.colors.textMuted)
-                    }
+                Column {
+                    Text(
+                        "LOG FOOD & DRINKS",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = AppTheme.colors.textMuted,
+                        letterSpacing = 1.2.sp
+                    )
+                    Text(
+                        "UK Database, Saved Items & Custom",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = AppTheme.colors.primary,
+                        fontSize = 11.sp
+                    )
                 }
+                IconButton(onClick = dismissWithAnim, modifier = Modifier.size(28.dp)) {
+                    Icon(Icons.Default.Close, contentDescription = "Close", tint = AppTheme.colors.textMuted)
+                }
+            }
 
                 Spacer(modifier = Modifier.height(10.dp))
 
@@ -2518,7 +2514,6 @@ fun UkFoodSearchDialog(
             }
         }
     }
-}
 
 @Composable
 fun SavedFoodItemRow(
@@ -2731,39 +2726,40 @@ fun LogScannedProductDialog(
     val brandColor = getSupermarketBrandColor(product.brandOrSupermarket)
     val isFound = product.name.isNotBlank()
 
-    Dialog(onDismissRequest = onDismiss) {
-        Surface(
-            shape = RoundedCornerShape(22.dp),
-            color = AppTheme.colors.surface,
-            border = BorderStroke(1.dp, AppTheme.colors.border),
-            modifier = Modifier.fillMaxWidth()
+    SlideUpBottomSheetDialog(
+        onDismissRequest = onDismiss,
+        maxHeightFraction = 0.90f
+    ) { dismissWithAnim ->
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 6.dp)
         ) {
-            Column(modifier = Modifier.padding(20.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            Icons.Default.QrCodeScanner,
-                            contentDescription = null,
-                            tint = if (isFound) AppTheme.colors.success else AppTheme.colors.primary,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = if (isFound) "PRODUCT IDENTIFIED" else "NEW SCANNED PRODUCT",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = if (isFound) AppTheme.colors.success else AppTheme.colors.primary,
-                            letterSpacing = 1.sp
-                        )
-                    }
-                    IconButton(onClick = onDismiss, modifier = Modifier.size(24.dp)) {
-                        Icon(Icons.Default.Close, contentDescription = "Close", tint = AppTheme.colors.textMuted)
-                    }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Default.QrCodeScanner,
+                        contentDescription = null,
+                        tint = if (isFound) AppTheme.colors.success else AppTheme.colors.primary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = if (isFound) "PRODUCT IDENTIFIED" else "NEW SCANNED PRODUCT",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isFound) AppTheme.colors.success else AppTheme.colors.primary,
+                        letterSpacing = 1.sp
+                    )
                 }
+                IconButton(onClick = dismissWithAnim, modifier = Modifier.size(24.dp)) {
+                    Icon(Icons.Default.Close, contentDescription = "Close", tint = AppTheme.colors.textMuted)
+                }
+            }
 
                 Spacer(modifier = Modifier.height(14.dp))
 
@@ -3044,7 +3040,6 @@ fun LogScannedProductDialog(
             }
         }
     }
-}
 
 @Composable
 fun EditCalorieGoalDialog(
@@ -3075,227 +3070,220 @@ fun EditCalorieGoalDialog(
         )
     }
 
-    Dialog(onDismissRequest = onDismiss) {
-        Surface(
-            shape = RoundedCornerShape(20.dp),
-            color = AppTheme.colors.surface,
-            border = BorderStroke(1.dp, AppTheme.colors.border),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(modifier = Modifier.padding(20.dp)) {
-                Text(
-                    text = "SET DAILY CALORIE GOAL",
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = AppTheme.colors.textMuted,
-                    letterSpacing = 1.2.sp
-                )
-                Spacer(modifier = Modifier.height(14.dp))
+    SlideUpBottomSheetDialog(onDismissRequest = onDismiss) { dismissWithAnim ->
+        Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) {
+            Text(
+                text = "SET DAILY CALORIE GOAL",
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                color = AppTheme.colors.textMuted,
+                letterSpacing = 1.2.sp
+            )
+            Spacer(modifier = Modifier.height(14.dp))
 
-                // Mode 1: Auto BMR
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = if (!useCustom) AppTheme.colors.primary.copy(alpha = 0.18f) else AppTheme.colors.surfaceElevated,
-                    border = BorderStroke(
-                        1.dp,
-                        if (!useCustom) AppTheme.colors.primary else AppTheme.colors.border
-                    ),
+            // Mode 1: Auto BMR
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = if (!useCustom) AppTheme.colors.primary.copy(alpha = 0.18f) else AppTheme.colors.surfaceElevated,
+                border = BorderStroke(
+                    1.dp,
+                    if (!useCustom) AppTheme.colors.primary else AppTheme.colors.border
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { useCustom = false }
+            ) {
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable { useCustom = false }
+                        .padding(12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
+                    Column {
+                        Text(
+                            "Auto-Calculated (BMR / TDEE)",
+                            color = if (!useCustom) AppTheme.colors.primary else AppTheme.colors.textPrimary,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 13.sp
+                        )
+                        Text(
+                            "$calculatedBmr kcal / day (Mifflin-St Jeor formula)",
+                            color = AppTheme.colors.textMuted,
+                            fontSize = 11.sp
+                        )
+                    }
+                    RadioButton(
+                        selected = !useCustom,
+                        onClick = { useCustom = false },
+                        colors = RadioButtonDefaults.colors(
+                            selectedColor = AppTheme.colors.primary,
+                            unselectedColor = AppTheme.colors.textMuted
+                        )
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Mode 2: Custom Daily Calories
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = if (useCustom) AppTheme.colors.primary.copy(alpha = 0.18f) else AppTheme.colors.surfaceElevated,
+                border = BorderStroke(
+                    1.dp,
+                    if (useCustom) AppTheme.colors.primary else AppTheme.colors.border
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { useCustom = true }
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(12.dp),
+                        modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column {
                             Text(
-                                "Auto-Calculated (BMR / TDEE)",
-                                color = if (!useCustom) AppTheme.colors.primary else AppTheme.colors.textPrimary,
+                                "Custom Daily Target",
+                                color = if (useCustom) AppTheme.colors.primary else AppTheme.colors.textPrimary,
                                 fontWeight = FontWeight.SemiBold,
                                 fontSize = 13.sp
                             )
                             Text(
-                                "$calculatedBmr kcal / day (Mifflin-St Jeor formula)",
+                                "Manually define your daily calorie ceiling",
                                 color = AppTheme.colors.textMuted,
                                 fontSize = 11.sp
                             )
                         }
                         RadioButton(
-                            selected = !useCustom,
-                            onClick = { useCustom = false },
+                            selected = useCustom,
+                            onClick = { useCustom = true },
                             colors = RadioButtonDefaults.colors(
                                 selectedColor = AppTheme.colors.primary,
                                 unselectedColor = AppTheme.colors.textMuted
                             )
                         )
                     }
-                }
 
-                Spacer(modifier = Modifier.height(8.dp))
+                    if (useCustom) {
+                        Spacer(modifier = Modifier.height(10.dp))
+                        OutlinedTextField(
+                            value = calorieInput,
+                            onValueChange = { input ->
+                                if (input.all { it.isDigit() } && input.length <= 5) {
+                                    calorieInput = input
+                                }
+                            },
+                            label = { Text("Daily Target (kcal)") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = AppTheme.colors.primary,
+                                unfocusedBorderColor = AppTheme.colors.border,
+                                focusedContainerColor = AppTheme.colors.inputBackground,
+                                unfocusedContainerColor = AppTheme.colors.inputBackground,
+                                focusedTextColor = AppTheme.colors.textPrimary,
+                                unfocusedTextColor = AppTheme.colors.textPrimary
+                            )
+                        )
 
-                // Mode 2: Custom Daily Calories
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = if (useCustom) AppTheme.colors.primary.copy(alpha = 0.18f) else AppTheme.colors.surfaceElevated,
-                    border = BorderStroke(
-                        1.dp,
-                        if (useCustom) AppTheme.colors.primary else AppTheme.colors.border
-                    ),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { useCustom = true }
-                ) {
-                    Column(modifier = Modifier.padding(12.dp)) {
+                        Spacer(modifier = Modifier.height(8.dp))
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
-                            Column {
-                                Text(
-                                    "Custom Daily Target",
-                                    color = if (useCustom) AppTheme.colors.primary else AppTheme.colors.textPrimary,
-                                    fontWeight = FontWeight.SemiBold,
-                                    fontSize = 13.sp
-                                )
-                                Text(
-                                    "Manually define your daily calorie ceiling",
-                                    color = AppTheme.colors.textMuted,
-                                    fontSize = 11.sp
-                                )
-                            }
-                            RadioButton(
-                                selected = useCustom,
-                                onClick = { useCustom = true },
-                                colors = RadioButtonDefaults.colors(
-                                    selectedColor = AppTheme.colors.primary,
-                                    unselectedColor = AppTheme.colors.textMuted
-                                )
-                            )
-                        }
-
-                        if (useCustom) {
-                            Spacer(modifier = Modifier.height(10.dp))
-                            OutlinedTextField(
-                                value = calorieInput,
-                                onValueChange = { input ->
-                                    if (input.all { it.isDigit() } && input.length <= 5) {
-                                        calorieInput = input
-                                    }
-                                },
-                                label = { Text("Daily Target (kcal)") },
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                modifier = Modifier.fillMaxWidth(),
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = AppTheme.colors.primary,
-                                    unfocusedBorderColor = AppTheme.colors.border,
-                                    focusedContainerColor = AppTheme.colors.inputBackground,
-                                    unfocusedContainerColor = AppTheme.colors.inputBackground,
-                                    focusedTextColor = AppTheme.colors.textPrimary,
-                                    unfocusedTextColor = AppTheme.colors.textPrimary
-                                )
-                            )
-
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                listOf(1500, 1800, 2000, 2200, 2500).forEach { preset ->
-                                    val isSelected = calorieInput == preset.toString()
-                                    Surface(
-                                        shape = RoundedCornerShape(6.dp),
-                                        color = if (isSelected) AppTheme.colors.primary else AppTheme.colors.surface,
-                                        border = BorderStroke(1.dp, if (isSelected) AppTheme.colors.primary else AppTheme.colors.border),
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .clickable { calorieInput = preset.toString() }
+                            listOf(1500, 1800, 2000, 2200, 2500).forEach { preset ->
+                                val isSelected = calorieInput == preset.toString()
+                                Surface(
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = if (isSelected) AppTheme.colors.primary else AppTheme.colors.surface,
+                                    border = BorderStroke(1.dp, if (isSelected) AppTheme.colors.primary else AppTheme.colors.border),
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clickable { calorieInput = preset.toString() }
+                                ) {
+                                    Box(
+                                        contentAlignment = Alignment.Center,
+                                        modifier = Modifier.padding(vertical = 6.dp)
                                     ) {
-                                        Box(
-                                            contentAlignment = Alignment.Center,
-                                            modifier = Modifier.padding(vertical = 6.dp)
-                                        ) {
-                                            Text(
-                                                text = "$preset",
-                                                color = if (isSelected) Color.White else AppTheme.colors.textSecondary,
-                                                fontSize = 10.sp,
-                                                fontWeight = FontWeight.Bold
-                                            )
-                                        }
+                                        Text(
+                                            text = "$preset",
+                                            color = if (isSelected) Color.White else AppTheme.colors.textSecondary,
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
                                     }
                                 }
                             }
                         }
                     }
                 }
+            }
 
-                Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
-                // Live Weight Loss Projection Preview
-                val bannerColor = when (projection.trajectory) {
-                    WeightTrajectory.WEIGHT_LOSS -> AppTheme.colors.success
-                    WeightTrajectory.WEIGHT_GAIN -> AppTheme.colors.warning
-                    WeightTrajectory.MAINTENANCE -> AppTheme.colors.primary
-                }
+            // Live Weight Loss Projection Preview
+            val bannerColor = when (projection.trajectory) {
+                WeightTrajectory.WEIGHT_LOSS -> AppTheme.colors.success
+                WeightTrajectory.WEIGHT_GAIN -> AppTheme.colors.warning
+                WeightTrajectory.MAINTENANCE -> AppTheme.colors.primary
+            }
 
-                Surface(
-                    shape = RoundedCornerShape(10.dp),
-                    color = bannerColor.copy(alpha = if (AppTheme.colors.isDark) 0.15f else 0.10f),
-                    border = BorderStroke(1.dp, bannerColor.copy(alpha = 0.35f)),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(modifier = Modifier.padding(10.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "PROJECTED CHANGE:",
-                                color = bannerColor,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 11.sp
-                            )
-                            Text(
-                                text = projection.summaryText,
-                                color = bannerColor,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 12.sp
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(2.dp))
+            Surface(
+                shape = RoundedCornerShape(10.dp),
+                color = bannerColor.copy(alpha = if (AppTheme.colors.isDark) 0.15f else 0.10f),
+                border = BorderStroke(1.dp, bannerColor.copy(alpha = 0.35f)),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(10.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         Text(
-                            text = "Daily deficit: ${projection.dailyDeficit} kcal vs estimated TDEE (${projection.tdee} kcal/day).",
-                            color = AppTheme.colors.textSecondary,
+                            text = "PROJECTED CHANGE:",
+                            color = bannerColor,
+                            fontWeight = FontWeight.Bold,
                             fontSize = 11.sp
                         )
+                        Text(
+                            text = projection.summaryText,
+                            color = bannerColor,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp
+                        )
                     }
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = "Daily deficit: ${projection.dailyDeficit} kcal vs estimated TDEE (${projection.tdee} kcal/day).",
+                        color = AppTheme.colors.textSecondary,
+                        fontSize = 11.sp
+                    )
                 }
+            }
 
-                Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
+            ) {
+                TextButton(onClick = dismissWithAnim) {
+                    Text("Cancel", color = AppTheme.colors.textMuted)
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                Button(
+                    onClick = {
+                        val parsed = calorieInput.toIntOrNull() ?: 2000
+                        onSave(useCustom, if (parsed > 0) parsed else 2000)
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = AppTheme.colors.primary),
+                    shape = RoundedCornerShape(10.dp)
                 ) {
-                    TextButton(onClick = onDismiss) {
-                        Text("Cancel", color = AppTheme.colors.textMuted)
-                    }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Button(
-                        onClick = {
-                            val parsed = calorieInput.toIntOrNull() ?: 2000
-                            onSave(useCustom, if (parsed > 0) parsed else 2000)
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = AppTheme.colors.primary),
-                        shape = RoundedCornerShape(10.dp)
-                    ) {
-                        Text("Save Goal", fontWeight = FontWeight.Bold, color = Color.White)
-                    }
+                    Text("Save Goal", fontWeight = FontWeight.Bold, color = Color.White)
                 }
             }
         }

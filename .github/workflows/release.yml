@@ -108,7 +108,7 @@ jobs:
           elif [ -n "${{ inputs.tag_name }}" ]; then
             TAG="${{ inputs.tag_name }}"
           else
-            TAG="v1.2.4"
+            TAG="v1.2.7"
           fi
           echo "TARGET_TAG=$TAG" >> $GITHUB_ENV
           echo "Target tag is: $TAG"

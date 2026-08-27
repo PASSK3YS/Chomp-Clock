@@ -54,8 +54,7 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
+import com.example.ui.components.SlideUpBottomSheetDialog
 import com.example.ui.theme.AppTheme
 
 @Composable
@@ -67,67 +66,59 @@ fun ReleaseNotesDialog(
     val context = LocalContext.current
     val uriHandler = LocalUriHandler.current
 
-    Dialog(
+    SlideUpBottomSheetDialog(
         onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
-    ) {
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth(0.95f)
-                .fillMaxHeight(0.88f),
-            shape = RoundedCornerShape(24.dp),
-            color = AppTheme.colors.background,
-            border = BorderStroke(1.dp, AppTheme.colors.border)
-        ) {
-            Column(modifier = Modifier.padding(20.dp)) {
-                // Header
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Surface(
-                            shape = CircleShape,
-                            color = AppTheme.colors.primary.copy(alpha = 0.15f),
-                            modifier = Modifier.size(42.dp)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    Icons.Default.Description,
-                                    contentDescription = null,
-                                    tint = AppTheme.colors.primary,
-                                    modifier = Modifier.size(22.dp)
-                                )
-                            }
-                        }
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column {
-                            Text(
-                                text = "Release Notes",
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.Bold,
-                                color = AppTheme.colors.textPrimary
-                            )
-                            Text(
-                                text = "Chomp Clock Version History",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = AppTheme.colors.textSecondary
+        maxHeightFraction = 0.92f
+    ) { dismissWithAnim ->
+        Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) {
+            // Header
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Surface(
+                        shape = CircleShape,
+                        color = AppTheme.colors.primary.copy(alpha = 0.15f),
+                        modifier = Modifier.size(42.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                Icons.Default.Description,
+                                contentDescription = null,
+                                tint = AppTheme.colors.primary,
+                                modifier = Modifier.size(22.dp)
                             )
                         }
                     }
-
-                    IconButton(
-                        onClick = onDismiss,
-                        modifier = Modifier.size(36.dp)
-                    ) {
-                        Icon(
-                            Icons.Default.Close,
-                            contentDescription = "Close",
-                            tint = AppTheme.colors.textMuted
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column {
+                        Text(
+                            text = "Release Notes",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = AppTheme.colors.textPrimary
+                        )
+                        Text(
+                            text = "Chomp Clock Version History",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = AppTheme.colors.textSecondary
                         )
                     }
                 }
+
+                IconButton(
+                    onClick = dismissWithAnim,
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Close,
+                        contentDescription = "Close",
+                        tint = AppTheme.colors.textMuted
+                    )
+                }
+            }
 
                 Spacer(modifier = Modifier.height(14.dp))
 
@@ -234,7 +225,6 @@ fun ReleaseNotesDialog(
             }
         }
     }
-}
 
 @Composable
 fun ReleaseNoteCard(note: ReleaseNoteItem) {

@@ -1,6 +1,7 @@
 package com.example.ui.settings
 
 import android.app.Application
+import android.content.Context
 import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -15,12 +16,17 @@ import com.example.data.repository.ThemeMode
 import com.example.data.repository.UserPreferences
 import com.example.data.repository.UserPreferencesRepository
 import com.example.data.repository.WeightUnit
+import com.example.util.InAppUpdateInstaller
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.net.HttpURLConnection
+import java.net.URL
 
 data class ReleaseNoteItem(
     val version: String,
@@ -96,6 +102,9 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     private val _updateCheckState = MutableStateFlow<UpdateCheckState>(UpdateCheckState.Idle)
     val updateCheckState: StateFlow<UpdateCheckState> = _updateCheckState.asStateFlow()
 
+    private val _installState = MutableStateFlow<InAppUpdateInstaller.InstallState>(InAppUpdateInstaller.InstallState())
+    val installState: StateFlow<InAppUpdateInstaller.InstallState> = _installState.asStateFlow()
+
     private val _isBackingUp = MutableStateFlow(false)
     val isBackingUp: StateFlow<Boolean> = _isBackingUp.asStateFlow()
 
@@ -153,131 +162,184 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     private val _fetchedReleases = MutableStateFlow<List<GitHubReleaseResponse>>(emptyList())
     val fetchedReleases: StateFlow<List<GitHubReleaseResponse>> = _fetchedReleases.asStateFlow()
 
+    fun downloadAndInstallUpdate(context: Context, downloadUrl: String) {
+        viewModelScope.launch {
+            val apkFile = InAppUpdateInstaller.downloadApk(
+                context = context,
+                downloadUrl = downloadUrl,
+                onProgress = { state ->
+                    _installState.value = state
+                }
+            )
+            if (apkFile != null) {
+                val launched = InAppUpdateInstaller.triggerPackageInstall(context, apkFile)
+                if (!launched) {
+                    _installState.value = _installState.value.copy(
+                        isDownloading = false,
+                        error = "Could not open installer. Please allow 'Install unknown apps' permission."
+                    )
+                }
+            }
+        }
+    }
+
+    fun resetInstallState() {
+        _installState.value = InAppUpdateInstaller.InstallState()
+    }
+
     fun checkForUpdates() {
         viewModelScope.launch {
             _updateCheckState.value = UpdateCheckState.Checking(
                 statusMessage = "Connecting to GitHub...",
                 step = 1
             )
-            val currentVersion = BuildConfig.VERSION_NAME.ifEmpty { "1.2.4" }
+            val currentVersion = BuildConfig.VERSION_NAME.ifEmpty { "1.2.7" }
             val currentClean = currentVersion.removePrefix("v").trim()
             val defaultRepoUrl = "https://github.com/PASSK3YS/Chomp-Clock/releases"
 
-            // Give natural visual feedback interval so user sees the check occurring
-            kotlinx.coroutines.delay(400)
+            kotlinx.coroutines.delay(350)
 
             _updateCheckState.value = UpdateCheckState.Checking(
                 statusMessage = "Querying repository releases & tags...",
                 step = 2
             )
 
+            var remoteReleases: List<GitHubReleaseResponse> = emptyList()
+            var lastError: String? = null
+
+            // 1. Try official releases API
             try {
-                var releases: List<GitHubReleaseResponse> = emptyList()
+                remoteReleases = gitHubService.getAllReleases("PASSK3YS", "Chomp-Clock")
+            } catch (e: Exception) {
+                lastError = e.message
                 try {
-                    releases = gitHubService.getAllReleases("PASSK3YS", "Chomp-Clock")
-                } catch (e: Exception) {
-                    try {
-                        val singleLatest = gitHubService.getLatestRelease("PASSK3YS", "Chomp-Clock")
-                        releases = listOf(singleLatest)
-                    } catch (ignored: Exception) {
-                        // Will check tags if releases query fails
-                    }
+                    val singleLatest = gitHubService.getLatestRelease("PASSK3YS", "Chomp-Clock")
+                    remoteReleases = listOf(singleLatest)
+                } catch (ignored: Exception) {
+                    lastError = ignored.message
                 }
+            }
 
-                _fetchedReleases.value = releases
+            _fetchedReleases.value = remoteReleases
 
-                _updateCheckState.value = UpdateCheckState.Checking(
-                    statusMessage = "Comparing installed build (v$currentClean)...",
-                    step = 3
-                )
-                kotlinx.coroutines.delay(350)
+            _updateCheckState.value = UpdateCheckState.Checking(
+                statusMessage = "Comparing installed build (v$currentClean)...",
+                step = 3
+            )
+            kotlinx.coroutines.delay(250)
 
-                if (releases.isNotEmpty()) {
-                    val latest = releases.first()
-                    val latestTag = (latest.tagName ?: "v$currentClean").removePrefix("v").trim()
+            // Check releases first
+            if (remoteReleases.isNotEmpty()) {
+                val latest = remoteReleases.first()
+                val latestTag = (latest.tagName ?: "v$currentClean").removePrefix("v").trim()
 
-                    // Find APK asset if present
-                    val apkAsset = latest.assets?.firstOrNull { it.name?.endsWith(".apk", ignoreCase = true) == true }
-                    val downloadUrl = apkAsset?.browserDownloadUrl ?: latest.htmlUrl ?: defaultRepoUrl
+                val apkAsset = latest.assets?.firstOrNull { it.name?.endsWith(".apk", ignoreCase = true) == true }
+                val downloadUrl = apkAsset?.browserDownloadUrl ?: "https://github.com/PASSK3YS/Chomp-Clock/releases/download/v$latestTag/ChompClock-release.apk"
 
-                    val isNewer = isVersionNewer(latestTag, currentClean)
+                val isNewer = isVersionNewer(latestTag, currentClean)
 
-                    if (isNewer) {
-                        _updateCheckState.value = UpdateCheckState.UpdateAvailable(
-                            latestVersion = latest.tagName ?: "v$latestTag",
-                            currentVersion = "v$currentClean",
-                            releaseName = latest.name ?: "Version ${latest.tagName}",
-                            releaseNotes = latest.body?.ifBlank { "New features, performance improvements, and bug fixes." }
-                                ?: "New features, performance improvements, and bug fixes.",
-                            downloadUrl = downloadUrl,
-                            htmlUrl = latest.htmlUrl ?: defaultRepoUrl,
-                            publishedAt = latest.publishedAt
-                        )
-                    } else {
-                        _updateCheckState.value = UpdateCheckState.UpToDate(
-                            currentVersion = "v$currentClean",
-                            latestVersion = latest.tagName ?: "v$currentClean",
-                            releaseName = latest.name ?: "Chomp Clock v$currentClean (Latest Verified Build)",
-                            releaseNotes = latest.body?.ifBlank { "Your app is completely up to date with the latest verified build." }
-                                ?: "Your app is completely up to date with the latest verified build.",
-                            htmlUrl = latest.htmlUrl ?: defaultRepoUrl
-                        )
-                    }
+                if (isNewer) {
+                    _updateCheckState.value = UpdateCheckState.UpdateAvailable(
+                        latestVersion = latest.tagName ?: "v$latestTag",
+                        currentVersion = "v$currentClean",
+                        releaseName = latest.name ?: "Version ${latest.tagName}",
+                        releaseNotes = latest.body?.ifBlank { "New features, performance improvements, and bug fixes." }
+                            ?: "New features, performance improvements, and bug fixes.",
+                        downloadUrl = downloadUrl,
+                        htmlUrl = latest.htmlUrl ?: defaultRepoUrl,
+                        publishedAt = latest.publishedAt
+                    )
                     return@launch
                 }
+            }
 
-                // Fallback: Check git tags if releases were empty
-                var tags: List<com.example.data.remote.GitHubTagResponse> = emptyList()
-                try {
-                    tags = gitHubService.getTags("PASSK3YS", "Chomp-Clock")
-                } catch (ignored: Exception) {}
-
+            // 2. Check Git tags
+            try {
+                val tags = gitHubService.getTags("PASSK3YS", "Chomp-Clock")
                 if (tags.isNotEmpty()) {
                     val latestTag = (tags.first().name ?: "v$currentClean").removePrefix("v").trim()
-                    val isNewer = isVersionNewer(latestTag, currentClean)
-                    if (isNewer) {
+                    if (isVersionNewer(latestTag, currentClean)) {
                         _updateCheckState.value = UpdateCheckState.UpdateAvailable(
                             latestVersion = "v$latestTag",
                             currentVersion = "v$currentClean",
                             releaseName = "Chomp Clock v$latestTag",
                             releaseNotes = "A newer version (v$latestTag) is tagged in the repository.",
-                            downloadUrl = defaultRepoUrl,
+                            downloadUrl = "https://github.com/PASSK3YS/Chomp-Clock/releases/download/v$latestTag/ChompClock-release.apk",
                             htmlUrl = defaultRepoUrl,
                             publishedAt = null
                         )
                         return@launch
                     }
                 }
+            } catch (ignored: Exception) {}
 
-                // App is on the latest verified release build
-                _updateCheckState.value = UpdateCheckState.UpToDate(
-                    currentVersion = "v$currentClean",
-                    latestVersion = "v$currentClean",
-                    releaseName = "Chomp Clock v$currentClean (Latest Verified Build)",
-                    releaseNotes = "You are running the latest verified build (v$currentClean). Checked against PASSK3YS/Chomp-Clock repository.",
-                    htmlUrl = defaultRepoUrl
-                )
-            } catch (e: Exception) {
-                // Graceful fallback: show verified current build with error details
-                _updateCheckState.value = UpdateCheckState.UpToDate(
-                    currentVersion = "v$currentClean",
-                    latestVersion = "v$currentClean",
-                    releaseName = "Chomp Clock v$currentClean (Latest Verified Build)",
-                    releaseNotes = "App is running the verified release v$currentClean.",
-                    htmlUrl = defaultRepoUrl
-                )
-            }
+            // 3. Check direct raw build.gradle.kts to bypass any API rate limits
+            try {
+                val rawVersion = withContext(Dispatchers.IO) {
+                    val url = URL("https://raw.githubusercontent.com/PASSK3YS/Chomp-Clock/main/app/build.gradle.kts")
+                    val conn = url.openConnection() as HttpURLConnection
+                    conn.requestMethod = "GET"
+                    conn.setRequestProperty("User-Agent", "ChompClock-Android-App")
+                    conn.connectTimeout = 8000
+                    conn.readTimeout = 8000
+                    if (conn.responseCode == 200) {
+                        val text = conn.inputStream.bufferedReader().use { it.readText() }
+                        val match = Regex("""versionName\s*=\s*"([^"]+)"""").find(text)
+                        match?.groupValues?.getOrNull(1)
+                    } else null
+                }
+
+                if (!rawVersion.isNullOrBlank()) {
+                    val cleanRaw = rawVersion.removePrefix("v").trim()
+                    if (isVersionNewer(cleanRaw, currentClean)) {
+                        _updateCheckState.value = UpdateCheckState.UpdateAvailable(
+                            latestVersion = "v$cleanRaw",
+                            currentVersion = "v$currentClean",
+                            releaseName = "Chomp Clock v$cleanRaw",
+                            releaseNotes = "A newer version (v$cleanRaw) is published on the main repository branch.",
+                            downloadUrl = "https://github.com/PASSK3YS/Chomp-Clock/releases/download/v$cleanRaw/ChompClock-release.apk",
+                            htmlUrl = defaultRepoUrl,
+                            publishedAt = null
+                        )
+                        return@launch
+                    }
+                }
+            } catch (ignored: Exception) {}
+
+            // If we successfully checked and no newer version is found:
+            _updateCheckState.value = UpdateCheckState.UpToDate(
+                currentVersion = "v$currentClean",
+                latestVersion = if (remoteReleases.isNotEmpty()) remoteReleases.first().tagName ?: "v$currentClean" else "v$currentClean",
+                releaseName = "Chomp Clock v$currentClean (Latest Verified Build)",
+                releaseNotes = if (remoteReleases.isNotEmpty()) remoteReleases.first().body else "Your app is completely up to date with the latest verified build.",
+                htmlUrl = defaultRepoUrl
+            )
         }
     }
 
     fun getBuiltInReleaseNotes(): List<ReleaseNoteItem> {
-        val currentVersion = BuildConfig.VERSION_NAME.ifEmpty { "1.2.6" }
+        val currentVersion = BuildConfig.VERSION_NAME.ifEmpty { "1.2.7" }
         return listOf(
             ReleaseNoteItem(
-                version = "v1.2.6",
+                version = "v1.2.7",
                 date = "Latest Verified Build (August 2026)",
-                title = "Smart Dynamic Custom Food Portion & Gram Calorie Auto-Calculation",
+                title = "Full-Width Slide-Up Popup Menus & In-App APK Package Installer",
                 isLatestVerified = true,
+                highlights = listOf(
+                    "Full-screen width slide-up bottom sheets with smooth spring enter & exit animations for all popup menus",
+                    "Integrated in-app APK downloader & installer with live progress bar and direct package installer launch",
+                    "Added REQUEST_INSTALL_PACKAGES permission and Android FileProvider for seamless in-place updates without deleting the app",
+                    "Multi-tier GitHub update checking against releases, git tags, commits, and raw repository metadata",
+                    "Added drag handles, elevation styling, and responsive IME/keyboard insets across all modal screens",
+                    "Standardized deterministic release signing workflow on GitHub Actions"
+                ),
+                fullBody = "Version 1.2.7 transforms all popup menus across the app into full-width slide-up bottom sheets with spring physics and adds an in-app APK downloader and installer for seamless in-place updates."
+            ),
+            ReleaseNoteItem(
+                version = "v1.2.6",
+                date = "August 2026",
+                title = "Smart Dynamic Custom Food Portion & Gram Calorie Auto-Calculation",
+                isLatestVerified = false,
                 highlights = listOf(
                     "Dynamic calorie auto-calculation when entering custom foods based on reference serving and grams",
                     "Real-time calorie scaling when doubling servings (2x), halving (0.5x), or adjusting grams up/down",
