@@ -318,13 +318,24 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun getBuiltInReleaseNotes(): List<ReleaseNoteItem> {
-        val currentVersion = BuildConfig.VERSION_NAME.ifEmpty { "1.3.6" }
+        val currentVersion = BuildConfig.VERSION_NAME.ifEmpty { "1.3.7" }
         return listOf(
+            ReleaseNoteItem(
+                version = "v1.3.7",
+                date = "August 2026",
+                title = "Total APK Signature Unification",
+                isLatestVerified = true,
+                highlights = listOf(
+                    "Fully unified the cryptographic signing keys across both GitHub Releases and direct AI Studio exports",
+                    "Updates will now strictly honor identical signatures regardless of the APK download source"
+                ),
+                fullBody = "Version 1.3.7 completely overhauls the build pipeline to force the local development environment to use the exact same persistent keystore as GitHub Actions. Moving forward, APK signatures will permanently match."
+            ),
             ReleaseNoteItem(
                 version = "v1.3.6",
                 date = "August 2026",
                 title = "UI Simplifications",
-                isLatestVerified = true,
+                isLatestVerified = false,
                 highlights = listOf(
                     "Simplified the Material Design Theme toggle",
                     "Streamlined in-app update status messages"

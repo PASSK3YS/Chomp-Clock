@@ -1,4 +1,5 @@
 import com.google.gms.googleservices.GoogleServicesPlugin.MissingGoogleServicesStrategy
+import java.util.Base64
 
 plugins {
   alias(libs.plugins.android.application)
@@ -17,13 +18,32 @@ android {
     applicationId = "com.aistudio.chompclock.asdfgh"
     minSdk = 24
     targetSdk = 36
-    versionCode = 22
-    versionName = "1.3.6"
+    versionCode = 23
+    versionName = "1.3.7"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
 
   signingConfigs {
+    getByName("debug") {
+      val base64File = file("${rootDir}/debug.keystore.base64")
+      val localKeystore = file("${rootDir}/debug_local.keystore")
+      if (base64File.exists() && !localKeystore.exists()) {
+        try {
+          val base64String = base64File.readText().replace("\n", "").replace("\r", "")
+          val decodedBytes = Base64.getDecoder().decode(base64String)
+          localKeystore.writeBytes(decodedBytes)
+        } catch (e: Exception) {
+          e.printStackTrace()
+        }
+      }
+      if (localKeystore.exists()) {
+        storeFile = localKeystore
+        storePassword = "android"
+        keyAlias = "androiddebugkey"
+        keyPassword = "android"
+      }
+    }
     create("release") {
       val keystorePath = System.getenv("KEYSTORE_PATH")
       val keystoreFile = if (!keystorePath.isNullOrEmpty()) file(keystorePath) else file("${rootDir}/my-upload-key.jks")
