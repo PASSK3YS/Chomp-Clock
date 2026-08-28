@@ -1,17 +1,22 @@
 package com.example.ui.weight
 
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.NotificationsNone
+import androidx.compose.material.icons.filled.Scale
 import androidx.compose.material.icons.filled.TrendingDown
 import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material.icons.filled.Tune
@@ -61,6 +66,7 @@ fun WeightScreen(
     var selectedDateMillis by remember { mutableStateOf(System.currentTimeMillis()) }
     var entryToDelete by remember { mutableStateOf<WeightEntry?>(null) }
     var showReminderDialog by remember { mutableStateOf(false) }
+    var showPastWeightLogsDialog by remember { mutableStateOf(false) }
 
     val username = userPrefs?.username ?: "User"
     val avatarId = userPrefs?.avatarId
@@ -194,9 +200,23 @@ fun WeightScreen(
         )
     }
 
+    if (showPastWeightLogsDialog) {
+        PastWeightLogsDialog(
+            entries = entries,
+            weightUnit = weightUnit,
+            useImperial = useImperial,
+            onDismiss = { showPastWeightLogsDialog = false },
+            onDeleteEntry = { viewModel.deleteWeightEntry(it) },
+            onLogNewWeighIn = {
+                // Focus is already on the screen's weight logging form
+            }
+        )
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .verticalScroll(rememberScrollState())
             .padding(horizontal = 24.dp, vertical = 16.dp)
     ) {
         // Top Bar
@@ -729,97 +749,239 @@ fun WeightScreen(
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // Past Logs List
-        Text(
-            "PAST WEIGHT LOGS",
-            style = MaterialTheme.typography.labelSmall,
-            color = AppTheme.colors.textMuted,
-            fontWeight = FontWeight.Bold,
-            letterSpacing = 1.2.sp
-        )
+        // PAST WEIGHT LOGS ENTRY
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                "PAST WEIGHT LOGS",
+                style = MaterialTheme.typography.labelSmall,
+                color = AppTheme.colors.textMuted,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 1.2.sp
+            )
+            if (entries.isNotEmpty()) {
+                Text(
+                    text = "View All (${entries.size})",
+                    color = AppTheme.colors.primary,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier
+                        .clickable { showPastWeightLogsDialog = true }
+                        .padding(4.dp)
+                )
+            }
+        }
         Spacer(modifier = Modifier.height(8.dp))
 
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
+        // Clickable Past Logs Summary Card (Opens Dedicated Popup Menu)
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { showPastWeightLogsDialog = true },
+            shape = RoundedCornerShape(16.dp),
+            color = AppTheme.colors.surface,
+            border = BorderStroke(1.dp, AppTheme.colors.border)
         ) {
             if (entries.isEmpty()) {
-                item {
-                    Surface(
-                        modifier = Modifier.fillMaxWidth(),
-                        color = AppTheme.colors.surface,
-                        shape = RoundedCornerShape(14.dp),
-                        border = BorderStroke(1.dp, AppTheme.colors.border)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(14.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f)
                     ) {
-                        Text(
-                            "No weight logs recorded yet. Add your current or past weight above!",
-                            color = AppTheme.colors.textMuted,
-                            style = MaterialTheme.typography.bodySmall,
-                            modifier = Modifier.padding(16.dp)
-                        )
-                    }
-                }
-            } else {
-                items(entries) { entry ->
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(containerColor = AppTheme.colors.surface),
-                        border = BorderStroke(1.dp, AppTheme.colors.border),
-                        shape = RoundedCornerShape(14.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .padding(start = 16.dp, top = 10.dp, bottom = 10.dp, end = 8.dp)
-                                .fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                        Surface(
+                            shape = CircleShape,
+                            color = AppTheme.colors.primary.copy(alpha = 0.12f),
+                            modifier = Modifier.size(38.dp)
                         ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                val dateFormat = SimpleDateFormat("dd MMM yyyy", Locale.getDefault())
-                                Text(
-                                    text = dateFormat.format(Date(entry.date)),
-                                    fontWeight = FontWeight.Medium,
-                                    color = AppTheme.colors.textPrimary,
-                                    fontSize = 14.sp
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    Icons.Default.Scale,
+                                    contentDescription = null,
+                                    tint = AppTheme.colors.primary,
+                                    modifier = Modifier.size(20.dp)
                                 )
-                                if (entry.waistCm != null && entry.waistCm > 0f) {
-                                    val waistStr = if (useImperial) {
-                                        String.format(Locale.getDefault(), "Waist: %.1f in", entry.waistCm / 2.54f)
-                                    } else {
-                                        String.format(Locale.getDefault(), "Waist: %.1f cm", entry.waistCm)
-                                    }
-                                    Text(
-                                        text = waistStr,
-                                        color = AppTheme.colors.textMuted,
-                                        fontSize = 12.sp
-                                    )
-                                }
-                            }
-
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    text = WeightUtils.formatWeight(entry.weightKg, weightUnit),
-                                    color = AppTheme.colors.primary,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 15.sp
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                IconButton(
-                                    onClick = { entryToDelete = entry },
-                                    modifier = Modifier.size(32.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.DeleteOutline,
-                                        contentDescription = "Delete weight log",
-                                        tint = AppTheme.colors.textMuted,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                }
                             }
                         }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column {
+                            Text(
+                                "No weight logs recorded yet",
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 13.5.sp,
+                                color = AppTheme.colors.textPrimary
+                            )
+                            Text(
+                                "Add your current or past weigh-in above",
+                                color = AppTheme.colors.textMuted,
+                                fontSize = 11.5.sp
+                            )
+                        }
+                    }
+                    Icon(
+                        Icons.AutoMirrored.Filled.ArrowForward,
+                        contentDescription = "Open History",
+                        tint = AppTheme.colors.textMuted,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            } else {
+                val latestEntry = entries.first()
+                val dateFormat = SimpleDateFormat("dd MMM yyyy", Locale.getDefault())
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(14.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Surface(
+                            shape = CircleShape,
+                            color = AppTheme.colors.primary.copy(alpha = 0.12f),
+                            modifier = Modifier.size(38.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    Icons.Default.Scale,
+                                    contentDescription = null,
+                                    tint = AppTheme.colors.primary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    "Latest Weigh-In",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 13.5.sp,
+                                    color = AppTheme.colors.textPrimary
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Surface(
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = AppTheme.colors.primary.copy(alpha = 0.12f),
+                                    border = BorderStroke(1.dp, AppTheme.colors.primary.copy(alpha = 0.35f))
+                                ) {
+                                    Text(
+                                        text = WeightUtils.formatWeight(latestEntry.weightKg, weightUnit),
+                                        color = AppTheme.colors.primary,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 11.sp,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(2.dp))
+                            val waistInfo = if (latestEntry.waistCm != null && latestEntry.waistCm > 0f) {
+                                val waistStr = if (useImperial) {
+                                    String.format(Locale.getDefault(), "Waist: %.1f in", latestEntry.waistCm / 2.54f)
+                                } else {
+                                    String.format(Locale.getDefault(), "Waist: %.1f cm", latestEntry.waistCm)
+                                }
+                                " • $waistStr"
+                            } else ""
+                            Text(
+                                text = "${dateFormat.format(Date(latestEntry.date))}$waistInfo",
+                                color = AppTheme.colors.textMuted,
+                                fontSize = 11.5.sp
+                            )
+                        }
+                    }
+
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            "Open",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = AppTheme.colors.primary
+                        )
+                        Spacer(modifier = Modifier.width(2.dp))
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowForward,
+                            contentDescription = "Open Past Weight Logs",
+                            tint = AppTheme.colors.primary,
+                            modifier = Modifier.size(16.dp)
+                        )
                     }
                 }
             }
         }
+
+        Spacer(modifier = Modifier.height(14.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            OutlinedButton(
+                onClick = { showPastWeightLogsDialog = true },
+                modifier = Modifier
+                    .weight(1f)
+                    .height(48.dp),
+                shape = RoundedCornerShape(14.dp),
+                border = BorderStroke(1.dp, AppTheme.colors.border),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = AppTheme.colors.textPrimary)
+            ) {
+                Icon(
+                    Icons.Default.History,
+                    contentDescription = null,
+                    tint = AppTheme.colors.primary,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("Past Logs", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+            }
+
+            Button(
+                onClick = {
+                    val parsedKg = if (weightUnit == WeightUnit.STONE_LBS) {
+                        WeightUtils.parseToKg(stoneInput, lbsInput, WeightUnit.STONE_LBS)
+                    } else {
+                        WeightUtils.parseToKg(weightInput, "", weightUnit)
+                    }
+
+                    if (parsedKg != null && parsedKg > 0f) {
+                        val rawWaist = waistInput.toFloatOrNull()
+                        val waistCm = if (useImperial && rawWaist != null) rawWaist * 2.54f else rawWaist
+                        viewModel.addWeightEntry(parsedKg, waistCm, selectedDateMillis)
+                        weightInput = ""
+                        stoneInput = ""
+                        lbsInput = ""
+                        waistInput = ""
+                        selectedDateMillis = System.currentTimeMillis()
+                    }
+                },
+                modifier = Modifier
+                    .weight(1f)
+                    .height(48.dp),
+                shape = RoundedCornerShape(14.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = AppTheme.colors.primary,
+                    contentColor = Color.White
+                )
+            ) {
+                val isToday = SimpleDateFormat("yyyyMMdd", Locale.getDefault()).format(Date(selectedDateMillis)) ==
+                        SimpleDateFormat("yyyyMMdd", Locale.getDefault()).format(Date())
+                val btnLabel = if (isToday) "Save Weight" else "Save for Date"
+                Text(btnLabel, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
     }
 }

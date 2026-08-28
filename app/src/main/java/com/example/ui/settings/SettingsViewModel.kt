@@ -318,13 +318,27 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun getBuiltInReleaseNotes(): List<ReleaseNoteItem> {
-        val currentVersion = BuildConfig.VERSION_NAME.ifEmpty { "1.3.2" }
+        val currentVersion = BuildConfig.VERSION_NAME.ifEmpty { "1.3.3" }
         return listOf(
             ReleaseNoteItem(
-                version = "v1.3.2",
+                version = "v1.3.3",
                 date = "Latest Verified Build (August 2026)",
-                title = "Dedicated Recent Fasts Popup Menu & Session Analytics",
+                title = "Dedicated Past Weight Logs Popup Menu & Progress Analytics",
                 isLatestVerified = true,
+                highlights = listOf(
+                    "Dedicated Past Weight Logs pop-up menu featuring full weigh-in history and body measurements",
+                    "Weight progress overview analytics including Total Logs, Latest, Lowest Weight, and Net Change",
+                    "Individual weigh-in log deletion with safety confirmation dialog",
+                    "Progressive weight delta indicators (loss/gain) compared against previous check-ins",
+                    "Streamlined weight screen layout with quick-access summary cards and fast-action buttons"
+                ),
+                fullBody = "Version 1.3.3 brings a dedicated slide-up popup menu for Past Weight Logs, featuring aggregate progress analytics (Total Logs, Latest, Lowest Weight, Net Change), progressive delta indicators, individual log deletion, and streamlined weight tracking."
+            ),
+            ReleaseNoteItem(
+                version = "v1.3.2",
+                date = "August 2026",
+                title = "Dedicated Recent Fasts Popup Menu & Session Analytics",
+                isLatestVerified = false,
                 highlights = listOf(
                     "Dedicated Recent Fasts pop-up menu featuring full fasting history and session analytics",
                     "Aggregate statistics overview including Total Fasts, Average Length, Longest Session, and Goal Hit Rate",
