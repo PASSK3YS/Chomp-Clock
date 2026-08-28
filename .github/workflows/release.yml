@@ -71,6 +71,12 @@ jobs:
           if [ -n "$KEYSTORE_BASE64" ]; then
             echo "$KEYSTORE_BASE64" | tr -d '\r\n ' | base64 --decode > my-upload-key.jks
             echo "Release keystore decoded from repository secret."
+          elif [ -f "debug.keystore.base64" ]; then
+            echo "Generating release signing keystore from consistent debug.keystore.base64..."
+            cat debug.keystore.base64 | tr -d '\r\n ' | base64 --decode > my-upload-key.jks
+            echo "STORE_PASSWORD=android" >> $GITHUB_ENV
+            echo "KEY_ALIAS=androiddebugkey" >> $GITHUB_ENV
+            echo "KEY_PASSWORD=android" >> $GITHUB_ENV
           else
             echo "Generating consistent release signing keystore for automated builds..."
             keytool -genkeypair -v \

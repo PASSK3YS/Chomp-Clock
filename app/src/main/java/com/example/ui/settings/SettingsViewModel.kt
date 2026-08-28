@@ -318,13 +318,25 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun getBuiltInReleaseNotes(): List<ReleaseNoteItem> {
-        val currentVersion = BuildConfig.VERSION_NAME.ifEmpty { "1.3.3" }
+        val currentVersion = BuildConfig.VERSION_NAME.ifEmpty { "1.3.5" }
         return listOf(
             ReleaseNoteItem(
-                version = "v1.3.3",
+                version = "v1.3.5",
                 date = "Latest Verified Build (August 2026)",
-                title = "Dedicated Past Weight Logs Popup Menu & Progress Analytics",
+                title = "Seamless In-App Updates & Consistent Signatures",
                 isLatestVerified = true,
+                highlights = listOf(
+                    "Fixed in-app APK updates failing due to cryptographic signature mismatch",
+                    "Unified build pipeline to use a consistent release signing keystore",
+                    "Updates will now seamlessly install over the existing app without requiring deletion"
+                ),
+                fullBody = "Version 1.3.5 resolves an issue where Android prevented in-app updates due to mismatched cryptographic signatures in automated builds. Moving forward, all updates will install seamlessly without requiring you to delete the app first."
+            ),
+            ReleaseNoteItem(
+                version = "v1.3.3",
+                date = "August 2026",
+                title = "Dedicated Past Weight Logs Popup Menu & Progress Analytics",
+                isLatestVerified = false,
                 highlights = listOf(
                     "Dedicated Past Weight Logs pop-up menu featuring full weigh-in history and body measurements",
                     "Weight progress overview analytics including Total Logs, Latest, Lowest Weight, and Net Change",

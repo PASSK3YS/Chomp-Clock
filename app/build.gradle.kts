@@ -17,8 +17,8 @@ android {
     applicationId = "com.aistudio.chompclock.asdfgh"
     minSdk = 24
     targetSdk = 36
-    versionCode = 19
-    versionName = "1.3.3"
+    versionCode = 21
+    versionName = "1.3.5"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
