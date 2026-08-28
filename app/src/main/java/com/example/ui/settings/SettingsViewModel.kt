@@ -318,13 +318,24 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun getBuiltInReleaseNotes(): List<ReleaseNoteItem> {
-        val currentVersion = BuildConfig.VERSION_NAME.ifEmpty { "1.3.5" }
+        val currentVersion = BuildConfig.VERSION_NAME.ifEmpty { "1.3.6" }
         return listOf(
             ReleaseNoteItem(
-                version = "v1.3.5",
-                date = "Latest Verified Build (August 2026)",
-                title = "Seamless In-App Updates & Consistent Signatures",
+                version = "v1.3.6",
+                date = "August 2026",
+                title = "UI Simplifications",
                 isLatestVerified = true,
+                highlights = listOf(
+                    "Simplified the Material Design Theme toggle",
+                    "Streamlined in-app update status messages"
+                ),
+                fullBody = "Version 1.3.6 removes unnecessary spacing and simplifies the text around the Material Design theme toggle and update status indicators."
+            ),
+            ReleaseNoteItem(
+                version = "v1.3.5",
+                date = "August 2026",
+                title = "Seamless In-App Updates & Consistent Signatures",
+                isLatestVerified = false,
                 highlights = listOf(
                     "Fixed in-app APK updates failing due to cryptographic signature mismatch",
                     "Unified build pipeline to use a consistent release signing keystore",

@@ -896,36 +896,21 @@ fun SettingsScreen(
                                 Spacer(modifier = Modifier.width(12.dp))
                                 Column {
                                     Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Text(
-                                            text = "Material You Dynamic Color",
+                                            text = "Material Design Theme",
                                             fontWeight = FontWeight.Bold,
                                             fontSize = 14.sp,
                                             color = AppTheme.colors.textPrimary
                                         )
-                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                                            Surface(
-                                                shape = RoundedCornerShape(4.dp),
-                                                color = AppTheme.colors.primary.copy(alpha = 0.2f)
-                                            ) {
-                                                Text(
-                                                    text = "Monet",
-                                                    fontSize = 10.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = AppTheme.colors.primary,
-                                                    modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
-                                                )
-                                            }
-                                        }
                                     }
                                     Spacer(modifier = Modifier.height(2.dp))
                                     Text(
                                         text = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
-                                            "Derives adaptive tones directly from your device wallpaper & system palette"
+                                            "Matches app colors to your device wallpaper."
                                         else
-                                            "Applies harmonious Google Material Design 3 dynamic color tokens",
+                                            "Applies default Material Design colors.",
                                         fontSize = 12.sp,
                                         color = AppTheme.colors.textSecondary
                                     )
@@ -1706,17 +1691,12 @@ fun SettingsScreen(
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = "Installed: v${BuildConfig.VERSION_NAME.ifEmpty { "1.3.5" }}",
+                                text = "Installed: v${BuildConfig.VERSION_NAME.ifEmpty { "1.3.6" }}",
                                 fontWeight = FontWeight.SemiBold,
                                 fontSize = 12.sp,
                                 color = AppTheme.colors.textPrimary
                             )
                         }
-                        Text(
-                            text = "Latest Verified Build",
-                            color = AppTheme.colors.textMuted,
-                            fontSize = 11.sp
-                        )
                     }
                 }
 
@@ -2115,54 +2095,13 @@ fun SettingsScreen(
                                                 fontSize = 13.sp
                                             )
                                         }
-                                        Surface(
-                                            shape = RoundedCornerShape(6.dp),
-                                            color = AppTheme.colors.success.copy(alpha = 0.2f)
-                                        ) {
-                                            Text(
-                                                text = "Verified",
-                                                fontSize = 10.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = AppTheme.colors.success,
-                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                            )
-                                        }
                                     }
                                     Spacer(modifier = Modifier.height(6.dp))
                                     Text(
-                                        text = "Your app is running the latest verified release build (v${BuildConfig.VERSION_NAME.ifEmpty { "1.2.6" }}), checked against PASSK3YS/Chomp-Clock on GitHub.",
+                                        text = "You're on the latest version of the app.",
                                         color = AppTheme.colors.textSecondary,
                                         fontSize = 11.sp
                                     )
-                                    Spacer(modifier = Modifier.height(10.dp))
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                    ) {
-                                        OutlinedButton(
-                                            onClick = { showReleaseNotesDialog = true },
-                                            shape = RoundedCornerShape(8.dp),
-                                            border = BorderStroke(1.dp, AppTheme.colors.border),
-                                            modifier = Modifier.weight(1f)
-                                        ) {
-                                            Icon(Icons.Default.Description, contentDescription = null, tint = AppTheme.colors.primary, modifier = Modifier.size(14.dp))
-                                            Spacer(modifier = Modifier.width(4.dp))
-                                            Text("Release Notes", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                        }
-
-                                        OutlinedButton(
-                                            onClick = {
-                                                uriHandler.openUri(state.htmlUrl)
-                                            },
-                                            shape = RoundedCornerShape(8.dp),
-                                            border = BorderStroke(1.dp, AppTheme.colors.border),
-                                            modifier = Modifier.weight(1f)
-                                        ) {
-                                            Icon(Icons.Default.OpenInNew, contentDescription = null, tint = AppTheme.colors.textMuted, modifier = Modifier.size(14.dp))
-                                            Spacer(modifier = Modifier.width(4.dp))
-                                            Text("GitHub Releases", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                        }
-                                    }
                                 }
                             }
                         }
@@ -2178,7 +2117,7 @@ fun SettingsScreen(
                                         Icon(Icons.Default.CheckCircle, contentDescription = null, tint = AppTheme.colors.success, modifier = Modifier.size(18.dp))
                                         Spacer(modifier = Modifier.width(6.dp))
                                         Text(
-                                            text = "App is Up to Date (v${BuildConfig.VERSION_NAME.ifEmpty { "1.2.6" }})",
+                                            text = "App is Up to Date (v${BuildConfig.VERSION_NAME.ifEmpty { "1.3.6" }})",
                                             color = AppTheme.colors.textPrimary,
                                             fontWeight = FontWeight.Bold,
                                             fontSize = 13.sp
@@ -2186,35 +2125,10 @@ fun SettingsScreen(
                                     }
                                     Spacer(modifier = Modifier.height(4.dp))
                                     Text(
-                                        text = "Latest verified build active. You can view all release notes or open the GitHub releases page directly.",
+                                        text = "You're on the latest version of the app.",
                                         color = AppTheme.colors.textSecondary,
                                         fontSize = 11.sp
                                     )
-                                    Spacer(modifier = Modifier.height(10.dp))
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                    ) {
-                                        OutlinedButton(
-                                            onClick = { showReleaseNotesDialog = true },
-                                            shape = RoundedCornerShape(8.dp),
-                                            border = BorderStroke(1.dp, AppTheme.colors.border),
-                                            modifier = Modifier.weight(1f)
-                                        ) {
-                                            Text("Release Notes", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                        }
-
-                                        OutlinedButton(
-                                            onClick = {
-                                                uriHandler.openUri("https://github.com/PASSK3YS/Chomp-Clock/releases")
-                                            },
-                                            shape = RoundedCornerShape(8.dp),
-                                            border = BorderStroke(1.dp, AppTheme.colors.border),
-                                            modifier = Modifier.weight(1f)
-                                        ) {
-                                            Text("GitHub Releases", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                        }
-                                    }
                                 }
                             }
                         }
