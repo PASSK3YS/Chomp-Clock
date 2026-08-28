@@ -318,13 +318,27 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun getBuiltInReleaseNotes(): List<ReleaseNoteItem> {
-        val currentVersion = BuildConfig.VERSION_NAME.ifEmpty { "1.3.1" }
+        val currentVersion = BuildConfig.VERSION_NAME.ifEmpty { "1.3.2" }
         return listOf(
             ReleaseNoteItem(
-                version = "v1.3.1",
+                version = "v1.3.2",
                 date = "Latest Verified Build (August 2026)",
-                title = "Popup Dialog Usability & Sticky Action Controls",
+                title = "Dedicated Recent Fasts Popup Menu & Session Analytics",
                 isLatestVerified = true,
+                highlights = listOf(
+                    "Dedicated Recent Fasts pop-up menu featuring full fasting history and session analytics",
+                    "Aggregate statistics overview including Total Fasts, Average Length, Longest Session, and Goal Hit Rate",
+                    "Individual fast session deletion with safety confirmation dialog",
+                    "Direct manual fast logging shortcut integrated within the recent fasts view",
+                    "Streamlined fasting home screen with quick-access history cards and bottom action controls"
+                ),
+                fullBody = "Version 1.3.2 moves Recent Fasts into its own dedicated slide-up popup menu complete with aggregate metrics (Total Fasts, Avg Length, Longest, Goal Hit Rate), individual log deletion, and direct manual past fast logging."
+            ),
+            ReleaseNoteItem(
+                version = "v1.3.1",
+                date = "August 2026",
+                title = "Popup Dialog Usability & Sticky Action Controls",
+                isLatestVerified = false,
                 highlights = listOf(
                     "Fixed popup menu clipping across Custom Food, Weigh-In Reminders, and Calorie Goal dialogs",
                     "Pinned sticky action bars to ensure save & log buttons remain visible above virtual keyboards",

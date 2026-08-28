@@ -16,6 +16,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Tune
@@ -62,6 +63,7 @@ fun FastingScreen(
     val detailedAchievements by viewModel.detailedAchievements.collectAsState()
 
     var showLogPastDialog by remember { mutableStateOf(false) }
+    var showRecentFastsDialog by remember { mutableStateOf(false) }
     var showStreakDialog by remember { mutableStateOf(false) }
     var showAchievementsDialog by remember { mutableStateOf(false) }
     var achievementsInitialCategory by remember { mutableStateOf(AchievementCategory.ALL) }
@@ -263,6 +265,15 @@ fun FastingScreen(
                 viewModel.logPastFast(start, end, target)
                 showLogPastDialog = false
             }
+        )
+    }
+
+    if (showRecentFastsDialog) {
+        RecentFastsDialog(
+            pastSessions = pastSessions,
+            onDismiss = { showRecentFastsDialog = false },
+            onDeleteSession = { viewModel.deleteSession(it) },
+            onLogManualFast = { showLogPastDialog = true }
         )
     }
 
@@ -559,115 +570,213 @@ fun FastingScreen(
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            Text(
-                "RECENT FASTS",
-                style = MaterialTheme.typography.labelSmall,
-                color = AppTheme.colors.textMuted,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 1.2.sp
-            )
+            // RECENT FASTS ENTRY
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "RECENT FASTS",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = AppTheme.colors.textMuted,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.2.sp
+                )
+                if (pastSessions.isNotEmpty()) {
+                    Text(
+                        text = "View All (${pastSessions.size})",
+                        color = AppTheme.colors.primary,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier
+                            .clickable { showRecentFastsDialog = true }
+                            .padding(4.dp)
+                    )
+                }
+            }
             Spacer(modifier = Modifier.height(8.dp))
 
-            LazyColumn(modifier = Modifier.weight(1f)) {
+            // Clickable Recent Fasts Summary Card (Opens Dedicated Popup Menu)
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { showRecentFastsDialog = true },
+                shape = RoundedCornerShape(16.dp),
+                color = AppTheme.colors.surface,
+                border = BorderStroke(1.dp, AppTheme.colors.border)
+            ) {
                 if (pastSessions.isEmpty()) {
-                    item {
-                        Surface(
-                            modifier = Modifier.fillMaxWidth(),
-                            color = AppTheme.colors.surface,
-                            shape = RoundedCornerShape(16.dp),
-                            border = BorderStroke(1.dp, AppTheme.colors.border)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(14.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.weight(1f)
                         ) {
-                            Text(
-                                "No fasts completed yet. Tap a preset above to begin!",
-                                color = AppTheme.colors.textMuted,
-                                style = MaterialTheme.typography.bodySmall,
-                                modifier = Modifier.padding(16.dp)
-                            )
-                        }
-                    }
-                } else {
-                    items(pastSessions.take(5)) { session ->
-                        val durationHrs = (session.endTime - session.startTime) / (1000 * 3600f)
-                        val targetHrs = session.durationTargetMillis / (1000 * 3600f)
-                        val hitGoal = durationHrs >= targetHrs
-                        val dateFormat = SimpleDateFormat("dd MMM, HH:mm", Locale.getDefault())
-
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 4.dp),
-                            colors = CardDefaults.cardColors(containerColor = AppTheme.colors.surface),
-                            border = BorderStroke(1.dp, AppTheme.colors.border),
-                            shape = RoundedCornerShape(14.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .padding(start = 12.dp, top = 8.dp, bottom = 8.dp, end = 4.dp)
-                                    .fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
+                            Surface(
+                                shape = CircleShape,
+                                color = AppTheme.colors.primary.copy(alpha = 0.12f),
+                                modifier = Modifier.size(38.dp)
                             ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        dateFormat.format(Date(session.startTime)),
-                                        fontWeight = FontWeight.Medium,
-                                        color = AppTheme.colors.textPrimary,
-                                        fontSize = 13.sp
-                                    )
-                                    Text(
-                                        "Target: ${String.format(Locale.getDefault(), "%.0fh", targetHrs)}",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = AppTheme.colors.textMuted
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        Icons.Default.History,
+                                        contentDescription = null,
+                                        tint = AppTheme.colors.primary,
+                                        modifier = Modifier.size(20.dp)
                                     )
                                 }
+                            }
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column {
+                                Text(
+                                    "No fasts completed yet",
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 13.5.sp,
+                                    color = AppTheme.colors.textPrimary
+                                )
+                                Text(
+                                    "Tap presets above or log manual fasts",
+                                    color = AppTheme.colors.textMuted,
+                                    fontSize = 11.5.sp
+                                )
+                            }
+                        }
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowForward,
+                            contentDescription = "Open History",
+                            tint = AppTheme.colors.textMuted,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                } else {
+                    val latestSession = pastSessions.first()
+                    val latestDurationHrs = (latestSession.endTime - latestSession.startTime) / (1000 * 3600f)
+                    val latestTargetHrs = latestSession.durationTargetMillis / (1000 * 3600f)
+                    val hitGoal = latestDurationHrs >= latestTargetHrs
+                    val dateFormat = SimpleDateFormat("dd MMM, HH:mm", Locale.getDefault())
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(14.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Surface(
+                                shape = CircleShape,
+                                color = AppTheme.colors.primary.copy(alpha = 0.12f),
+                                modifier = Modifier.size(38.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        Icons.Default.History,
+                                        contentDescription = null,
+                                        tint = AppTheme.colors.primary,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        "Latest Fast",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 13.5.sp,
+                                        color = AppTheme.colors.textPrimary
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
                                     Surface(
-                                        shape = RoundedCornerShape(8.dp),
+                                        shape = RoundedCornerShape(6.dp),
                                         color = if (hitGoal) AppTheme.colors.success.copy(alpha = 0.15f) else AppTheme.colors.surfaceElevated,
                                         border = BorderStroke(1.dp, if (hitGoal) AppTheme.colors.success.copy(alpha = 0.4f) else AppTheme.colors.border)
                                     ) {
                                         Text(
-                                            text = "${String.format(Locale.getDefault(), "%.1f", durationHrs)} hrs ${if (hitGoal) "✓" else ""}",
+                                            text = "${String.format(Locale.getDefault(), "%.1f", latestDurationHrs)}h ${if (hitGoal) "✓" else ""}",
                                             color = if (hitGoal) AppTheme.colors.success else AppTheme.colors.textSecondary,
                                             fontWeight = FontWeight.Bold,
-                                            fontSize = 12.sp,
-                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                        )
-                                    }
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    IconButton(
-                                        onClick = { fastToDelete = session },
-                                        modifier = Modifier.size(32.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.DeleteOutline,
-                                            contentDescription = "Delete fast log",
-                                            tint = AppTheme.colors.textMuted,
-                                            modifier = Modifier.size(17.dp)
+                                            fontSize = 11.sp,
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                                         )
                                     }
                                 }
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = "${dateFormat.format(Date(latestSession.startTime))} • Target: ${String.format(Locale.getDefault(), "%.0fh", latestTargetHrs)}",
+                                    color = AppTheme.colors.textMuted,
+                                    fontSize = 11.5.sp
+                                )
                             }
+                        }
+
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                "Open",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = AppTheme.colors.primary
+                            )
+                            Spacer(modifier = Modifier.width(2.dp))
+                            Icon(
+                                Icons.AutoMirrored.Filled.ArrowForward,
+                                contentDescription = "Open Recent Fasts",
+                                tint = AppTheme.colors.primary,
+                                modifier = Modifier.size(16.dp)
+                            )
                         }
                     }
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(14.dp))
 
-        Button(
-            onClick = { showLogPastDialog = true },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(48.dp),
-            shape = RoundedCornerShape(14.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = AppTheme.colors.primary,
-                contentColor = Color.White
-            )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Text("Log Past Fast Manually", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+            OutlinedButton(
+                onClick = { showRecentFastsDialog = true },
+                modifier = Modifier
+                    .weight(1f)
+                    .height(48.dp),
+                shape = RoundedCornerShape(14.dp),
+                border = BorderStroke(1.dp, AppTheme.colors.border),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = AppTheme.colors.textPrimary)
+            ) {
+                Icon(
+                    Icons.Default.History,
+                    contentDescription = null,
+                    tint = AppTheme.colors.primary,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("Recent Fasts", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+            }
+
+            Button(
+                onClick = { showLogPastDialog = true },
+                modifier = Modifier
+                    .weight(1f)
+                    .height(48.dp),
+                shape = RoundedCornerShape(14.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = AppTheme.colors.primary,
+                    contentColor = Color.White
+                )
+            ) {
+                Text("Log Past Fast", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+            }
         }
     }
 }

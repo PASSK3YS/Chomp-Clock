@@ -2468,10 +2468,10 @@ fun UkFoodSearchDialog(
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 Column(
-                                    modifier = Modifier.padding(top = 4.dp, bottom = 4.dp)
+                                    modifier = Modifier.padding(top = 8.dp, bottom = 14.dp)
                                 ) {
                                     HorizontalDivider(color = AppTheme.colors.border.copy(alpha = 0.5f), thickness = 1.dp)
-                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Spacer(modifier = Modifier.height(10.dp))
                                     Row(
                                         modifier = Modifier.fillMaxWidth(),
                                         horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -3048,10 +3048,10 @@ fun LogScannedProductDialog(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 20.dp, vertical = 8.dp)
+                        .padding(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 14.dp)
                 ) {
                     HorizontalDivider(color = AppTheme.colors.border.copy(alpha = 0.5f), thickness = 1.dp)
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
                     Button(
                         onClick = {
                             onConfirm(
@@ -3329,10 +3329,10 @@ fun EditCalorieGoalDialog(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 8.dp)
+                    .padding(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 14.dp)
             ) {
                 HorizontalDivider(color = AppTheme.colors.border.copy(alpha = 0.5f), thickness = 1.dp)
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(10.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.End
@@ -3352,7 +3352,6 @@ fun EditCalorieGoalDialog(
                         Text("Save Goal", fontWeight = FontWeight.Bold, color = Color.White)
                     }
                 }
-                Spacer(modifier = Modifier.height(4.dp))
             }
         }
     }

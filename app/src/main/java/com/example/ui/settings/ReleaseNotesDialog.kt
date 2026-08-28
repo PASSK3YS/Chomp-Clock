@@ -35,6 +35,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -185,46 +186,57 @@ fun ReleaseNotesDialog(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(14.dp))
-
-                // Bottom actions
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                // Sticky Bottom actions
+                Surface(
+                    color = AppTheme.colors.surface,
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    OutlinedButton(
-                        onClick = {
-                            uriHandler.openUri("https://github.com/PASSK3YS/Chomp-Clock/releases")
-                        },
-                        shape = RoundedCornerShape(12.dp),
-                        border = BorderStroke(1.dp, AppTheme.colors.border),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = AppTheme.colors.primary),
-                        modifier = Modifier.weight(1f)
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 8.dp, bottom = 14.dp)
                     ) {
-                        Icon(
-                            Icons.Default.OpenInNew,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            "GitHub Releases",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
+                        HorizontalDivider(color = AppTheme.colors.border.copy(alpha = 0.5f), thickness = 1.dp)
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            OutlinedButton(
+                                onClick = {
+                                    uriHandler.openUri("https://github.com/PASSK3YS/Chomp-Clock/releases")
+                                },
+                                shape = RoundedCornerShape(12.dp),
+                                border = BorderStroke(1.dp, AppTheme.colors.border),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = AppTheme.colors.primary),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Icon(
+                                    Icons.Default.OpenInNew,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    "GitHub Releases",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
 
-                    Button(
-                        onClick = onDismiss,
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = AppTheme.colors.primary),
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text(
-                            "Done",
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
+                            Button(
+                                onClick = onDismiss,
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = AppTheme.colors.primary),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text(
+                                    "Done",
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
+                            }
+                        }
                     }
                 }
             }

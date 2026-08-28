@@ -592,7 +592,7 @@ fun WeighInReminderDialog(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 8.dp)
+                    .padding(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 14.dp)
             ) {
                 HorizontalDivider(color = AppTheme.colors.border.copy(alpha = 0.5f), thickness = 1.dp)
                 Spacer(modifier = Modifier.height(10.dp))
