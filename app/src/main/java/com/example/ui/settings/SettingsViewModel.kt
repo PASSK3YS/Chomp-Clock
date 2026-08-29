@@ -318,13 +318,24 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun getBuiltInReleaseNotes(): List<ReleaseNoteItem> {
-        val currentVersion = BuildConfig.VERSION_NAME.ifEmpty { "1.3.7" }
+        val currentVersion = BuildConfig.VERSION_NAME.ifEmpty { "1.3.8" }
         return listOf(
+            ReleaseNoteItem(
+                version = "v1.3.8",
+                date = "August 2026",
+                title = "Goal Weight Tracking",
+                isLatestVerified = true,
+                highlights = listOf(
+                    "Set and track a target goal weight",
+                    "Dynamic distance tracking automatically calculates amount of weight remaining to lose or gain to hit target"
+                ),
+                fullBody = "Version 1.3.8 introduces persistent Goal Weight tracking. The Current Metrics dashboard now displays the exact distance to your target, updating automatically every time you log a new weight."
+            ),
             ReleaseNoteItem(
                 version = "v1.3.7",
                 date = "August 2026",
                 title = "Total APK Signature Unification",
-                isLatestVerified = true,
+                isLatestVerified = false,
                 highlights = listOf(
                     "Fully unified the cryptographic signing keys across both GitHub Releases and direct AI Studio exports",
                     "Updates will now strictly honor identical signatures regardless of the APK download source"
