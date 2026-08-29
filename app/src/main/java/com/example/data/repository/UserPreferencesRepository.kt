@@ -82,6 +82,7 @@ class UserPreferencesRepository(private val context: Context) {
             val username = preferences[USERNAME] ?: "User"
             val heightCm = preferences[HEIGHT_CM] ?: 170f
             val waistCm = preferences[WAIST_CM]
+            val goalWeightKg = preferences[GOAL_WEIGHT_KG]
             val gender = preferences[GENDER] ?: "Male"
             val weightUnitStr = preferences[WEIGHT_UNIT] ?: "KG"
             val weightUnit = WeightUnit.fromString(weightUnitStr)
@@ -116,6 +117,7 @@ class UserPreferencesRepository(private val context: Context) {
                 username = username,
                 heightCm = heightCm,
                 waistCm = waistCm,
+                goalWeightKg = goalWeightKg,
                 gender = gender,
                 weightUnit = weightUnit,
                 heightUnit = heightUnit,
@@ -151,6 +153,16 @@ class UserPreferencesRepository(private val context: Context) {
                 it[WAIST_CM] = waistCm
             } else {
                 it.remove(WAIST_CM)
+            }
+        }
+    }
+
+    suspend fun updateGoalWeight(goalWeightKg: Float?) {
+        dataStore.edit {
+            if (goalWeightKg != null && goalWeightKg > 0f) {
+                it[GOAL_WEIGHT_KG] = goalWeightKg
+            } else {
+                it.remove(GOAL_WEIGHT_KG)
             }
         }
     }
@@ -262,6 +274,7 @@ class UserPreferencesRepository(private val context: Context) {
         val USERNAME = stringPreferencesKey("username")
         val HEIGHT_CM = floatPreferencesKey("height_cm")
         val WAIST_CM = floatPreferencesKey("waist_cm")
+        val GOAL_WEIGHT_KG = floatPreferencesKey("goal_weight_kg")
         val GENDER = stringPreferencesKey("gender")
         val WEIGHT_UNIT = stringPreferencesKey("weight_unit")
         val HEIGHT_UNIT = stringPreferencesKey("height_unit")
@@ -287,6 +300,7 @@ data class UserPreferences(
     val username: String,
     val heightCm: Float,
     val waistCm: Float? = null,
+    val goalWeightKg: Float? = null,
     val gender: String, // "Male" or "Female"
     val weightUnit: WeightUnit = WeightUnit.KG,
     val heightUnit: HeightUnit = HeightUnit.CM,

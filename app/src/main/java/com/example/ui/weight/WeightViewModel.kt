@@ -47,6 +47,12 @@ class WeightViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
     
+    fun setGoalWeightKg(weightKg: Float?) {
+        viewModelScope.launch {
+            userPrefsRepo.updateGoalWeight(weightKg)
+        }
+    }
+    
     fun calculateBmi(weightKg: Float, heightCm: Float): Float {
         if (heightCm <= 0) return 0f
         val heightM = heightCm / 100

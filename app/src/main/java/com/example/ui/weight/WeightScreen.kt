@@ -14,6 +14,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.NotificationsNone
 import androidx.compose.material.icons.filled.Scale
@@ -67,6 +68,7 @@ fun WeightScreen(
     var entryToDelete by remember { mutableStateOf<WeightEntry?>(null) }
     var showReminderDialog by remember { mutableStateOf(false) }
     var showPastWeightLogsDialog by remember { mutableStateOf(false) }
+    var showGoalWeightDialog by remember { mutableStateOf(false) }
 
     val username = userPrefs?.username ?: "User"
     val avatarId = userPrefs?.avatarId
@@ -74,6 +76,7 @@ fun WeightScreen(
     val gender = userPrefs?.gender ?: "Male"
     val weightUnit = userPrefs?.weightUnit ?: WeightUnit.KG
     val heightUnit = userPrefs?.heightUnit ?: HeightUnit.CM
+    val goalWeightKg = userPrefs?.goalWeightKg
     val useImperial = (heightUnit == HeightUnit.FT_IN || weightUnit != WeightUnit.KG)
 
     val calendar = Calendar.getInstance()
@@ -210,6 +213,15 @@ fun WeightScreen(
             onLogNewWeighIn = {
                 // Focus is already on the screen's weight logging form
             }
+        )
+    }
+
+    if (showGoalWeightDialog) {
+        GoalWeightDialog(
+            currentGoalWeightKg = goalWeightKg,
+            weightUnit = weightUnit,
+            onDismiss = { showGoalWeightDialog = false },
+            onSave = { viewModel.setGoalWeightKg(it) }
         )
     }
 
@@ -400,6 +412,65 @@ fun WeightScreen(
                         )
                     }
                 }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Goal Weight Card
+        val goalWeightStr = if (goalWeightKg != null) WeightUtils.formatWeight(goalWeightKg, weightUnit) else "Not Set"
+        val progressPercent = if (goalWeightKg != null) {
+            val diff = latestWeight - goalWeightKg
+            val diffStr = WeightUtils.formatWeight(kotlin.math.abs(diff), weightUnit)
+            if (diff > 0.1f) "$diffStr to lose" else if (diff < -0.1f) "$diffStr to gain" else "Goal reached!"
+        } else {
+            "Tap to set your target weight"
+        }
+
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { showGoalWeightDialog = true },
+            colors = CardDefaults.cardColors(containerColor = AppTheme.colors.surface),
+            border = BorderStroke(1.dp, AppTheme.colors.border),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Row(
+                modifier = Modifier.padding(16.dp).fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = AppTheme.colors.primary.copy(alpha = 0.15f),
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(Icons.Default.Flag, contentDescription = null, tint = AppTheme.colors.primary, modifier = Modifier.size(18.dp))
+                        }
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column {
+                        Text(
+                            text = "Goal Weight",
+                            color = AppTheme.colors.textPrimary,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp
+                        )
+                        Text(
+                            text = progressPercent,
+                            color = AppTheme.colors.textSecondary,
+                            fontSize = 12.sp
+                        )
+                    }
+                }
+                Text(
+                    text = goalWeightStr,
+                    color = AppTheme.colors.primary,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp
+                )
             }
         }
 
