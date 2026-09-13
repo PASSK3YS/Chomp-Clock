@@ -218,7 +218,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun downloadAndInstallRelease(context: Context, release: GitHubReleaseResponse) {
-        val tagName = release.tagName?.removePrefix("v")?.trim() ?: "1.3.8"
+        val tagName = release.tagName?.removePrefix("v")?.trim() ?: "1.3.9"
         val assets = release.assets ?: emptyList()
         val releaseApk = assets.firstOrNull { it.name?.contains("release", ignoreCase = true) == true && it.name?.endsWith(".apk", ignoreCase = true) == true }
             ?: assets.firstOrNull { it.name?.contains("latest", ignoreCase = true) == true && it.name?.endsWith(".apk", ignoreCase = true) == true }
@@ -411,13 +411,25 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun getBuiltInReleaseNotes(): List<ReleaseNoteItem> {
-        val currentVersion = BuildConfig.VERSION_NAME.ifEmpty { "1.3.8" }
+        val currentVersion = BuildConfig.VERSION_NAME.ifEmpty { "1.3.9" }
         return listOf(
+            ReleaseNoteItem(
+                version = "v1.3.9",
+                date = "August 2026",
+                title = "In-App Updates & APK Installer Overhaul",
+                isLatestVerified = true,
+                highlights = listOf(
+                    "Native PackageInstaller session integration for direct in-app updates",
+                    "Select and install APK files directly from storage with verification",
+                    "Per-version installer directly from release notes and unknown apps permission helper"
+                ),
+                fullBody = "Version 1.3.9 delivers a complete overhaul to the update experience. You can now update seamlessly via Android's native PackageInstaller session API, install downloaded APKs from storage, and launch installers directly from the release notes list."
+            ),
             ReleaseNoteItem(
                 version = "v1.3.8",
                 date = "August 2026",
                 title = "Goal Weight Tracking",
-                isLatestVerified = true,
+                isLatestVerified = false,
                 highlights = listOf(
                     "Set and track a target goal weight",
                     "Dynamic distance tracking automatically calculates amount of weight remaining to lose or gain to hit target"

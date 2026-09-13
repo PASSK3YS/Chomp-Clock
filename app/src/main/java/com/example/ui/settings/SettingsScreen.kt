@@ -342,7 +342,7 @@ fun SettingsScreen(
 
     if (showReleaseNotesDialog) {
         val releaseNotes = viewModel.getBuiltInReleaseNotes()
-        val currentVer = BuildConfig.VERSION_NAME.ifEmpty { "1.3.8" }
+        val currentVer = BuildConfig.VERSION_NAME.ifEmpty { "1.3.9" }
         ReleaseNotesDialog(
             releaseNotes = releaseNotes,
             currentVersion = currentVer,
@@ -1705,7 +1705,7 @@ fun SettingsScreen(
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = "Installed: v${BuildConfig.VERSION_NAME.ifEmpty { "1.3.8" }}",
+                                text = "Installed: v${BuildConfig.VERSION_NAME.ifEmpty { "1.3.9" }}",
                                 fontWeight = FontWeight.SemiBold,
                                 fontSize = 12.sp,
                                 color = AppTheme.colors.textPrimary
@@ -2245,7 +2245,7 @@ fun SettingsScreen(
                                         Icon(Icons.Default.CheckCircle, contentDescription = null, tint = AppTheme.colors.success, modifier = Modifier.size(18.dp))
                                         Spacer(modifier = Modifier.width(6.dp))
                                         Text(
-                                            text = "App is Up to Date (v${BuildConfig.VERSION_NAME.ifEmpty { "1.3.8" }})",
+                                            text = "App is Up to Date (v${BuildConfig.VERSION_NAME.ifEmpty { "1.3.9" }})",
                                             color = AppTheme.colors.textPrimary,
                                             fontWeight = FontWeight.Bold,
                                             fontSize = 13.sp
