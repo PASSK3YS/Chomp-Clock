@@ -66,6 +66,16 @@ fun SettingsScreen(
     val scope = rememberCoroutineScope()
     val scrollState = rememberScrollState()
     val installState by viewModel.installState.collectAsState()
+    val selectedLocalApk by viewModel.selectedLocalApk.collectAsState()
+    val fetchedReleases by viewModel.fetchedReleases.collectAsState()
+
+    val apkPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            viewModel.selectLocalApkUri(context, uri)
+        }
+    }
 
     val p = userPrefs ?: UserPreferences(
         username = "User",
@@ -332,11 +342,15 @@ fun SettingsScreen(
 
     if (showReleaseNotesDialog) {
         val releaseNotes = viewModel.getBuiltInReleaseNotes()
-        val currentVer = BuildConfig.VERSION_NAME.ifEmpty { "1.2.4" }
+        val currentVer = BuildConfig.VERSION_NAME.ifEmpty { "1.3.8" }
         ReleaseNotesDialog(
             releaseNotes = releaseNotes,
             currentVersion = currentVer,
-            onDismiss = { showReleaseNotesDialog = false }
+            onDismiss = { showReleaseNotesDialog = false },
+            onInstallVersion = { versionString ->
+                showReleaseNotesDialog = false
+                viewModel.downloadAndInstallVersion(context, versionString)
+            }
         )
     }
 
@@ -1700,6 +1714,35 @@ fun SettingsScreen(
                     }
                 }
 
+                // Android Install Unknown Apps permission helper if needed
+                if (!InAppUpdateInstaller.canInstallApks(context)) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = AppTheme.colors.warning.copy(alpha = 0.12f),
+                        border = BorderStroke(1.dp, AppTheme.colors.warning.copy(alpha = 0.4f)),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { InAppUpdateInstaller.openInstallPermissionSettings(context) }
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.Security, contentDescription = null, tint = AppTheme.colors.warning, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Permission required: Enable 'Install unknown apps' to update Chomp Clock directly.",
+                                color = AppTheme.colors.textPrimary,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Icon(Icons.Default.ChevronRight, contentDescription = null, tint = AppTheme.colors.warning, modifier = Modifier.size(16.dp))
+                        }
+                    }
+                }
+
                 Spacer(modifier = Modifier.height(12.dp))
 
                 // Action buttons: Check for Updates & View Release Notes Popup
@@ -1743,6 +1786,134 @@ fun SettingsScreen(
                         Icon(Icons.Default.Description, contentDescription = null, tint = AppTheme.colors.primary, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(6.dp))
                         Text("Release Notes", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Select APK from Device button
+                OutlinedButton(
+                    onClick = {
+                        try {
+                            apkPickerLauncher.launch("application/vnd.android.package-archive")
+                        } catch (e: Exception) {
+                            apkPickerLauncher.launch("*/*")
+                        }
+                    },
+                    shape = RoundedCornerShape(10.dp),
+                    border = BorderStroke(1.dp, AppTheme.colors.border),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = AppTheme.colors.textPrimary),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Default.FileOpen, contentDescription = null, tint = AppTheme.colors.primary, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Select & Install APK from Storage", fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
+                }
+
+                // Selected local/downloaded APK card
+                val readyApk = installState.apkInfo ?: selectedLocalApk
+                if (readyApk != null && installState.localApkFile != null) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = AppTheme.colors.surfaceElevated,
+                        border = BorderStroke(1.dp, AppTheme.colors.primary.copy(alpha = 0.4f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.Android, contentDescription = null, tint = AppTheme.colors.primary, modifier = Modifier.size(20.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = "Selected APK Package",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 13.sp,
+                                        color = AppTheme.colors.textPrimary
+                                    )
+                                }
+                                Surface(
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = AppTheme.colors.primary.copy(alpha = 0.15f)
+                                ) {
+                                    Text(
+                                        text = "v${readyApk.versionName}",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = AppTheme.colors.primary,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(6.dp))
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = if (readyApk.isCompatiblePackage) "✓ Matches current package" else "⚠ Package: ${readyApk.packageName}",
+                                    fontSize = 11.sp,
+                                    color = if (readyApk.isCompatiblePackage) AppTheme.colors.success else AppTheme.colors.warning
+                                )
+                                Text(
+                                    text = "%.1f MB".format(readyApk.fileSizeBytes / (1024f * 1024f)),
+                                    fontSize = 11.sp,
+                                    color = AppTheme.colors.textMuted
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            Button(
+                                onClick = { viewModel.installSelectedLocalApk(context) },
+                                enabled = readyApk.isCompatiblePackage,
+                                colors = ButtonDefaults.buttonColors(containerColor = AppTheme.colors.primary),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(Icons.Default.SystemUpdate, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Install Selected APK (v${readyApk.versionName})", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            }
+                        }
+                    }
+                }
+
+                // Installation Error Banner if any
+                if (installState.error != null) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = Color(0xFFE53935).copy(alpha = 0.12f),
+                        border = BorderStroke(1.dp, Color(0xFFE53935).copy(alpha = 0.4f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(10.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.ErrorOutline, contentDescription = null, tint = Color(0xFFE53935), modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = installState.error ?: "",
+                                    color = Color(0xFFE53935),
+                                    fontSize = 11.sp,
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                            if (!InAppUpdateInstaller.canInstallApks(context)) {
+                                Spacer(modifier = Modifier.height(6.dp))
+                                TextButton(
+                                    onClick = { InAppUpdateInstaller.openInstallPermissionSettings(context) }
+                                ) {
+                                    Text("Open Android Permission Settings →", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = AppTheme.colors.primary)
+                                }
+                            }
+                        }
                     }
                 }
 
@@ -1878,7 +2049,7 @@ fun SettingsScreen(
                                             )
                                             Spacer(modifier = Modifier.width(8.dp))
                                             Text(
-                                                text = "New Update Available: ${state.latestVersion}",
+                                                text = "New Update: ${state.latestVersion}",
                                                 fontWeight = FontWeight.Bold,
                                                 color = AppTheme.colors.textPrimary,
                                                 fontSize = 14.sp
@@ -1906,7 +2077,7 @@ fun SettingsScreen(
                                     )
                                     Spacer(modifier = Modifier.height(10.dp))
 
-                                    // In-App Install Progress / Action
+                                    // In-App Install Progress
                                     val progress = installState
                                     if (progress.isDownloading) {
                                         Column(modifier = Modifier.fillMaxWidth()) {
@@ -1939,41 +2110,6 @@ fun SettingsScreen(
                                                 trackColor = AppTheme.colors.surfaceElevated
                                             )
                                         }
-                                    } else if (progress.isReadyToInstall) {
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                                            Spacer(modifier = Modifier.width(8.dp))
-                                            Text(
-                                                "Launching Android package installer...",
-                                                fontSize = 11.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = AppTheme.colors.primary
-                                            )
-                                        }
-                                    } else if (progress.error != null) {
-                                        Surface(
-                                            shape = RoundedCornerShape(8.dp),
-                                            color = Color(0xFFE53935).copy(alpha = 0.12f),
-                                            border = BorderStroke(1.dp, Color(0xFFE53935).copy(alpha = 0.4f)),
-                                            modifier = Modifier.fillMaxWidth()
-                                        ) {
-                                            Row(
-                                                modifier = Modifier.padding(8.dp),
-                                                verticalAlignment = Alignment.CenterVertically
-                                            ) {
-                                                Icon(Icons.Default.ErrorOutline, contentDescription = null, tint = Color(0xFFE53935), modifier = Modifier.size(16.dp))
-                                                Spacer(modifier = Modifier.width(6.dp))
-                                                Text(
-                                                    text = progress.error,
-                                                    color = Color(0xFFE53935),
-                                                    fontSize = 11.sp,
-                                                    modifier = Modifier.weight(1f)
-                                                )
-                                            }
-                                        }
                                     }
 
                                     Spacer(modifier = Modifier.height(10.dp))
@@ -1988,7 +2124,7 @@ fun SettingsScreen(
                                                 val url = state.downloadUrl ?: state.htmlUrl
                                                 viewModel.downloadAndInstallUpdate(context, url)
                                             },
-                                            enabled = !installState.isDownloading && !installState.isReadyToInstall,
+                                            enabled = !installState.isDownloading,
                                             colors = ButtonDefaults.buttonColors(containerColor = AppTheme.colors.success),
                                             shape = RoundedCornerShape(8.dp),
                                             modifier = Modifier.weight(1.2f)
@@ -2027,43 +2163,6 @@ fun SettingsScreen(
                                             Text("APK", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                         }
                                     }
-
-                                    // Android Install Unknown Apps permission helper if needed
-                                    if (!InAppUpdateInstaller.canInstallApks(context)) {
-                                        Spacer(modifier = Modifier.height(8.dp))
-                                        Surface(
-                                            shape = RoundedCornerShape(8.dp),
-                                            color = AppTheme.colors.warning.copy(alpha = 0.12f),
-                                            border = BorderStroke(1.dp, AppTheme.colors.warning.copy(alpha = 0.4f)),
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .clickable { InAppUpdateInstaller.openInstallPermissionSettings(context) }
-                                        ) {
-                                            Row(
-                                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                                                verticalAlignment = Alignment.CenterVertically
-                                            ) {
-                                                Icon(Icons.Default.Security, contentDescription = null, tint = AppTheme.colors.warning, modifier = Modifier.size(16.dp))
-                                                Spacer(modifier = Modifier.width(6.dp))
-                                                Text(
-                                                    text = "Tap to enable 'Install unknown apps' permission in Android Settings",
-                                                    color = AppTheme.colors.textPrimary,
-                                                    fontSize = 10.sp,
-                                                    fontWeight = FontWeight.SemiBold,
-                                                    modifier = Modifier.weight(1f)
-                                                )
-                                                Icon(Icons.Default.ChevronRight, contentDescription = null, tint = AppTheme.colors.warning, modifier = Modifier.size(16.dp))
-                                            }
-                                        }
-                                    }
-
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    Text(
-                                        text = "Note: If updating an existing debug build causes a signature mismatch ('App not installed'), export a data backup above first, then reinstall.",
-                                        color = AppTheme.colors.textMuted,
-                                        fontSize = 10.sp,
-                                        lineHeight = 13.sp
-                                    )
                                 }
                             }
                         }
@@ -2102,6 +2201,35 @@ fun SettingsScreen(
                                         color = AppTheme.colors.textSecondary,
                                         fontSize = 11.sp
                                     )
+                                    Spacer(modifier = Modifier.height(10.dp))
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        OutlinedButton(
+                                            onClick = {
+                                                viewModel.downloadAndInstallVersion(context, state.currentVersion)
+                                            },
+                                            shape = RoundedCornerShape(8.dp),
+                                            border = BorderStroke(1.dp, AppTheme.colors.border),
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Icon(Icons.Default.Refresh, contentDescription = null, tint = AppTheme.colors.primary, modifier = Modifier.size(14.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("Reinstall APK", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                        }
+
+                                        OutlinedButton(
+                                            onClick = { showReleaseNotesDialog = true },
+                                            shape = RoundedCornerShape(8.dp),
+                                            border = BorderStroke(1.dp, AppTheme.colors.border),
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Icon(Icons.Default.Description, contentDescription = null, tint = AppTheme.colors.primary, modifier = Modifier.size(14.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("All Versions", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
                                 }
                             }
                         }

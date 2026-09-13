@@ -69,6 +69,14 @@
                 <action android:name="android.intent.action.TIMEZONE_CHANGED" />
             </intent-filter>
         </receiver>
+
+        <receiver
+            android:name="com.example.util.PackageInstallStatusReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.example.chompclock.ACTION_INSTALL_STATUS" />
+            </intent-filter>
+        </receiver>
     </application>
 
 </manifest>

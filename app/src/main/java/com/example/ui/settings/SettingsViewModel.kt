@@ -17,6 +17,7 @@ import com.example.data.repository.UserPreferences
 import com.example.data.repository.UserPreferencesRepository
 import com.example.data.repository.WeightUnit
 import com.example.util.InAppUpdateInstaller
+import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -162,6 +163,86 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     private val _fetchedReleases = MutableStateFlow<List<GitHubReleaseResponse>>(emptyList())
     val fetchedReleases: StateFlow<List<GitHubReleaseResponse>> = _fetchedReleases.asStateFlow()
 
+    private val _selectedLocalApk = MutableStateFlow<InAppUpdateInstaller.ApkInfo?>(null)
+    val selectedLocalApk: StateFlow<InAppUpdateInstaller.ApkInfo?> = _selectedLocalApk.asStateFlow()
+
+    private val _selectedLocalFile = MutableStateFlow<File?>(null)
+    val selectedLocalFile: StateFlow<File?> = _selectedLocalFile.asStateFlow()
+
+    fun selectLocalApkUri(context: Context, uri: Uri) {
+        viewModelScope.launch {
+            _installState.value = InAppUpdateInstaller.InstallState(
+                isDownloading = true,
+                statusMessage = "Reading and inspecting selected APK file..."
+            )
+            val file = InAppUpdateInstaller.copyUriToApkFile(context, uri)
+            if (file != null) {
+                val apkInfo = InAppUpdateInstaller.inspectApk(context, file)
+                if (apkInfo != null) {
+                    _selectedLocalApk.value = apkInfo
+                    _selectedLocalFile.value = file
+                    _installState.value = InAppUpdateInstaller.InstallState(
+                        isReadyToInstall = true,
+                        apkInfo = apkInfo,
+                        localApkFile = file,
+                        statusMessage = "APK ready: v${apkInfo.versionName} (Build ${apkInfo.versionCode})"
+                    )
+                } else {
+                    _installState.value = InAppUpdateInstaller.InstallState(
+                        error = "The selected file is not a valid Android APK package."
+                    )
+                }
+            } else {
+                _installState.value = InAppUpdateInstaller.InstallState(
+                    error = "Failed to read the selected file."
+                )
+            }
+        }
+    }
+
+    fun installSelectedLocalApk(context: Context) {
+        val file = _selectedLocalFile.value ?: return
+        val result = InAppUpdateInstaller.triggerPackageInstall(context, file)
+        if (!result.first) {
+            if (result.second == "PERMISSION_REQUIRED") {
+                _installState.value = _installState.value.copy(
+                    error = "Permission needed: Please enable 'Install unknown apps' in Settings to install APK updates."
+                )
+                InAppUpdateInstaller.openInstallPermissionSettings(context)
+            } else {
+                _installState.value = _installState.value.copy(
+                    error = result.second ?: "Failed to launch package installer."
+                )
+            }
+        }
+    }
+
+    fun downloadAndInstallRelease(context: Context, release: GitHubReleaseResponse) {
+        val tagName = release.tagName?.removePrefix("v")?.trim() ?: "1.3.8"
+        val assets = release.assets ?: emptyList()
+        val releaseApk = assets.firstOrNull { it.name?.contains("release", ignoreCase = true) == true && it.name?.endsWith(".apk", ignoreCase = true) == true }
+            ?: assets.firstOrNull { it.name?.contains("latest", ignoreCase = true) == true && it.name?.endsWith(".apk", ignoreCase = true) == true }
+            ?: assets.firstOrNull { it.name?.endsWith(".apk", ignoreCase = true) == true }
+
+        val downloadUrl = releaseApk?.browserDownloadUrl
+            ?: "https://github.com/PASSK3YS/Chomp-Clock/releases/download/v$tagName/ChompClock-release.apk"
+
+        downloadAndInstallUpdate(context, downloadUrl)
+    }
+
+    fun downloadAndInstallVersion(context: Context, versionString: String) {
+        val clean = versionString.removePrefix("v").trim()
+        val matchingRelease = _fetchedReleases.value.firstOrNull {
+            it.tagName?.removePrefix("v")?.trim() == clean
+        }
+        if (matchingRelease != null) {
+            downloadAndInstallRelease(context, matchingRelease)
+        } else {
+            val downloadUrl = "https://github.com/PASSK3YS/Chomp-Clock/releases/download/v$clean/ChompClock-release.apk"
+            downloadAndInstallUpdate(context, downloadUrl)
+        }
+    }
+
     fun downloadAndInstallUpdate(context: Context, downloadUrl: String) {
         viewModelScope.launch {
             val apkFile = InAppUpdateInstaller.downloadApk(
@@ -172,12 +253,24 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 }
             )
             if (apkFile != null) {
-                val launched = InAppUpdateInstaller.triggerPackageInstall(context, apkFile)
-                if (!launched) {
-                    _installState.value = _installState.value.copy(
-                        isDownloading = false,
-                        error = "Could not open installer. Please allow 'Install unknown apps' permission."
-                    )
+                _selectedLocalFile.value = apkFile
+                _selectedLocalApk.value = InAppUpdateInstaller.inspectApk(context, apkFile)
+
+                val result = InAppUpdateInstaller.triggerPackageInstall(context, apkFile)
+                if (!result.first) {
+                    if (result.second == "PERMISSION_REQUIRED") {
+                        _installState.value = _installState.value.copy(
+                            isDownloading = false,
+                            isReadyToInstall = true,
+                            error = "Permission needed: Please enable 'Install unknown apps' in Settings to install APK updates."
+                        )
+                        InAppUpdateInstaller.openInstallPermissionSettings(context)
+                    } else {
+                        _installState.value = _installState.value.copy(
+                            isDownloading = false,
+                            error = result.second ?: "Failed to launch package installer."
+                        )
+                    }
                 }
             }
         }

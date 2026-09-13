@@ -26,10 +26,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -63,7 +65,8 @@ import com.example.ui.theme.AppTheme
 fun ReleaseNotesDialog(
     releaseNotes: List<ReleaseNoteItem>,
     currentVersion: String,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    onInstallVersion: ((String) -> Unit)? = null
 ) {
     val context = LocalContext.current
     val uriHandler = LocalUriHandler.current
@@ -182,7 +185,10 @@ fun ReleaseNotesDialog(
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     items(releaseNotes) { note ->
-                        ReleaseNoteCard(note = note)
+                        ReleaseNoteCard(
+                            note = note,
+                            onInstallVersion = onInstallVersion
+                        )
                     }
                 }
 
@@ -244,7 +250,10 @@ fun ReleaseNotesDialog(
     }
 
 @Composable
-fun ReleaseNoteCard(note: ReleaseNoteItem) {
+fun ReleaseNoteCard(
+    note: ReleaseNoteItem,
+    onInstallVersion: ((String) -> Unit)? = null
+) {
     var isExpanded by remember { mutableStateOf(note.isLatestVerified) }
 
     Card(
@@ -341,6 +350,33 @@ fun ReleaseNoteCard(note: ReleaseNoteItem) {
                                 fontSize = 12.sp,
                                 color = AppTheme.colors.textPrimary,
                                 lineHeight = 16.sp
+                            )
+                        }
+                    }
+
+                    if (onInstallVersion != null) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Button(
+                            onClick = { onInstallVersion(note.version) },
+                            shape = RoundedCornerShape(8.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (note.isLatestVerified) AppTheme.colors.primary else AppTheme.colors.surfaceElevated
+                            ),
+                            border = if (!note.isLatestVerified) BorderStroke(1.dp, AppTheme.colors.border) else null,
+                            modifier = Modifier.fillMaxWidth().height(36.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Download,
+                                contentDescription = null,
+                                tint = if (note.isLatestVerified) Color.White else AppTheme.colors.textPrimary,
+                                modifier = Modifier.size(15.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = if (note.isLatestVerified) "Install / Update to ${note.version}" else "Download & Install ${note.version}",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (note.isLatestVerified) Color.White else AppTheme.colors.textPrimary
                             )
                         }
                     }
